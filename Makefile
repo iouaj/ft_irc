@@ -1,4 +1,4 @@
-NAME = ft_irc
+NAME = ircserv
 
 CC = c++
 CFLAGS = -Wall -Wextra -Werror -std=c++98
@@ -6,7 +6,9 @@ CFLAGS = -Wall -Wextra -Werror -std=c++98
 INCLUDES = ft_irc.hpp
 
 FILES =	main \
-		Server
+		Server \
+		Request \
+		Client
 
 SRC = $(addsuffix .cpp, $(FILES))
 
