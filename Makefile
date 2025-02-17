@@ -8,7 +8,9 @@ INCLUDES = ft_irc.hpp
 FILES =	main \
 		Server \
 		Request \
-		Client
+		Client \
+		Channel \
+		utils
 
 SRC = $(addsuffix .cpp, $(FILES))
 

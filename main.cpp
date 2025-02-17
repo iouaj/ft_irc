@@ -4,6 +4,18 @@ void set_nonblocking(int fd) {
 	fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
 }
 
+std::list<std::string> split(std::string str)
+{
+	std::list<std::string> list;
+
+	while (str.empty() == false)
+	{
+		list.push_back(str.substr(0, str.find("\n")));
+		str = str.substr(str.find('\n') + 1);
+	}
+	return list;
+}
+
 int main (int argc, char *argv[])
 {
 	if (argc != 2)
@@ -13,7 +25,7 @@ int main (int argc, char *argv[])
 	}
 
 	std::string port(argv[1]);
-	for (size_t i; i < port.size(); i++)
+	for (size_t i = 0; i < port.size(); i++)
 	{
 		if (!std::isdigit(port[i]))
 		{
@@ -94,7 +106,7 @@ int main (int argc, char *argv[])
 
 					Server::addClient(client);
 
-					send(client_fd, "Set a nickname\n", 15, 0);
+					// send(client_fd, "Set a nickname\n", 15, 0);
 				}
 			} else {
 				// 📩 Message reçu d'un client
@@ -104,10 +116,21 @@ int main (int argc, char *argv[])
 					try
 					{
 						buffer[bytes_read] = 0;
-						Request req(buffer);
-						req.print();
+						std::list<std::string> list = split(buffer);
 
-						req.exec(events[i].data.fd);
+						while (list.empty() == false)
+						{
+							std::cout << "- " << list.front() << std::endl;
+							Request req(list.front().c_str());
+
+							req.exec(events[i].data.fd);
+							list.pop_front();
+						}
+
+						// Request req(buffer);
+						// req.print();
+
+						// req.exec(events[i].data.fd);
 					}
 					catch(const Request::InvalidRequestException& e)
 					{

@@ -121,7 +121,7 @@ Client	&Server::getClient(std::string nickname)
 	throw InvalidClientException();
 }
 
-const char	*Server::InvalidClientException::what(void) throw()
+const char	*Server::InvalidClientException::what(void) const throw()
 {
 	return ("Invalid Client");
 }

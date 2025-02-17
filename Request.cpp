@@ -11,6 +11,8 @@ std::map<std::string, int> Request::createMap(void) {
 	m["PART"] = 1;
 	m["PRIVMSG"] = 2;
 	m["QUIT"] = 0;
+	m["CAP"] = 1;
+	m["MODE"] = 1;
 	return m;
 }
 
@@ -19,9 +21,9 @@ const char *Request::InvalidRequestException::what(void) const throw()
 	return("Error : Invalid Request");
 };
 
-Request::Request(char *buffer)
+Request::Request(const char *buffer)
 {
-	this->c_str = buffer;
+	// this->c_str = buffer;
 	this->str = std::string(buffer);
 
 	std::istringstream iss(buffer);
@@ -77,7 +79,7 @@ void	Request::nick(int client_fd) const
 
 	client.setNickname(nickname);
 
-	std::string	message("Nickname changed for " + nickname + "\n");
+	std::string	message(":localhost 001 " + nickname + ":Welcome\n");
 
 	send(client_fd, message.c_str(), message.size(), 0);
 }
@@ -85,7 +87,7 @@ void	Request::nick(int client_fd) const
 void	Request::privmsg(int client_fd) const
 {
 	Client &client = Server::getClient(client_fd);
-	(void) client;
+	// (void) client;
 
 	const std::string target_nickname = this->param[0];
 
@@ -110,9 +112,25 @@ void	Request::privmsg(int client_fd) const
 
 		const std::string message = this->param[1];
 
-		send(target.getFd(), message.c_str(), message.size(), 0);
+		send_priv(target, client.getNickname() + " : " + message + "\n");
+		// send(target.getFd(), message.c_str(), message.size(), 0);
 	}
 }
+
+void	Request::user(int client_fd) const
+{
+
+	// if (this->param.size() != 4)
+
+
+	Client &client = Server::getClient(client_fd);
+
+	const std::string username = this->param[0];
+
+	client.setUsername(username);
+}
+
+// void	Request::mode
 
 void	Request::exec(int client_fd) const
 {
@@ -121,6 +139,10 @@ void	Request::exec(int client_fd) const
 		this->nick(client_fd);
 	} else if (!this->command.compare(0, 8, "PRIVMSG")) {
 		this->privmsg(client_fd);
+	} else if (!this->command.compare(0, 5, "USER")) {
+		this->user(client_fd);	
+	} else if (!this->command.compare(0, 4, "CAP")) {
+		std::cout << "CAP ignored." << std::endl;
 	} else {
 		std::cout << "Command not found" << std::endl;
 	}
