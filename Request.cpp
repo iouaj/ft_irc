@@ -37,7 +37,6 @@ Request::Request(char *buffer)
 
 	while (iss >> token)
 	{
-		std::cout << "check" << std::endl;
 		if (!token.empty() && token[0] == ':')
 		{
 			std::string rest;
@@ -78,7 +77,7 @@ void	Request::nick(int client_fd) const
 
 	client.setNickname(nickname);
 
-	std::string	message("Nickname changed for " + nickname);
+	std::string	message("Nickname changed for " + nickname + "\n");
 
 	send(client_fd, message.c_str(), message.size(), 0);
 }
@@ -86,31 +85,42 @@ void	Request::nick(int client_fd) const
 void	Request::privmsg(int client_fd) const
 {
 	Client &client = Server::getClient(client_fd);
+	(void) client;
 
-	// std::vector<std::string>::const_iterator	it = this->param.begin();
+	const std::string target_nickname = this->param[0];
 
-	// it++;
-	const std::string target = this->param[0];
+	if (!target_nickname.compare(0, 1, "#")) { //Channel
 
-	if (!target.compare(0, 1, "#")) { //Channel
+		// if (this->param[1].c_str()[0] != ':') {
+		// 	std::cerr << "Syntax Invalide" << std::endl;
+		// 	return ;
+		// }
 
-		if (this->param[1].c_str()[0] != ':') {
-			std::cerr << "Syntax Invalide" << std::endl;
-			return ;
-		}
+		const std::string message = this->param[1];
 
-		
 
 	} else { //DM
 
+		// if (this->param[1].c_str()[0] != ':') {
+		// 	std::cerr << "Syntax Invalide" << std::endl;
+		// 	return ;
+		// }
+
+		Client	&target = Server::getClient(target_nickname);
+
+		const std::string message = this->param[1];
+
+		send(target.getFd(), message.c_str(), message.size(), 0);
 	}
 }
 
 void	Request::exec(int client_fd) const
 {
-	if (this->command == "NICK")
+	if (!this->command.compare(0, 5, "NICK"))
 	{
 		this->nick(client_fd);
+	} else if (!this->command.compare(0, 8, "PRIVMSG")) {
+		this->privmsg(client_fd);
 	} else {
 		std::cout << "Command not found" << std::endl;
 	}

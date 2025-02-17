@@ -101,10 +101,27 @@ Client	&Server::getClient(int fd)
 {
 	std::vector<Client>::iterator	it = Server::_v.begin();
 
-	for (; it != Server::_v.begin(); it++)
+	for (; it != Server::_v.end(); it++)
 	{
 		if (it->getFd() == fd)
 			return *it;
 	}
-	return *it;
+	throw InvalidClientException();
+}
+
+Client	&Server::getClient(std::string nickname)
+{
+	std::vector<Client>::iterator	it = Server::_v.begin();
+
+	for (; it != Server::_v.end(); it++)
+	{
+		if (!it->getNickname().compare(nickname))
+			return *it;
+	}
+	throw InvalidClientException();
+}
+
+const char	*Server::InvalidClientException::what(void) throw()
+{
+	return ("Invalid Client");
 }

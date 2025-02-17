@@ -12,7 +12,15 @@ int main (int argc, char *argv[])
 		return 1;
 	}
 
-	(void) argv;
+	std::string port(argv[1]);
+	for (size_t i; i < port.size(); i++)
+	{
+		if (!std::isdigit(port[i]))
+		{
+			std::cerr << "Error: Invalid Port" << std::endl;
+			return 1;
+		}
+	}
 
 	int socketServer = socket(AF_INET, SOCK_STREAM, 0);
 	if (socketServer == -1)
@@ -25,7 +33,7 @@ int main (int argc, char *argv[])
 
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = INADDR_ANY;
-	server_addr.sin_port = htons(8080);
+	server_addr.sin_port = htons(std::atoi(port.c_str()));
 
 	if (bind(socketServer, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1)
 	{
@@ -75,6 +83,7 @@ int main (int argc, char *argv[])
 
 				int client_fd = accept(socketServer, (struct sockaddr *)&client_addr, &client_len);
 				if (client_fd != -1) {
+
 					event.events = EPOLLIN;
 					event.data.fd = client_fd;
 					epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &event);
@@ -90,10 +99,8 @@ int main (int argc, char *argv[])
 			} else {
 				// 📩 Message reçu d'un client
 				char buffer[1024];
-				int bytes_read = read(events[i].data.fd, buffer, sizeof(buffer));
+				int bytes_read = recv(events[i].data.fd, buffer, sizeof(buffer), 0);
 				if (bytes_read > 0) {
-					// send(events[i].data.fd, buffer, bytes_read, 0);  // Echo
-
 					try
 					{
 						buffer[bytes_read] = 0;
@@ -109,6 +116,7 @@ int main (int argc, char *argv[])
 
 				} else {
 					// 🔌 Déconnexion du client
+					std::cout << Server::getClient(events[i].data.fd).getNickname() << " disconnected." << std::endl;
 					close(events[i].data.fd);
 				}
 			}

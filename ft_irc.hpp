@@ -14,6 +14,7 @@
 #include <map>
 #include <sstream>
 #include <vector>
+#include <algorithm>
 
 class Client
 {
@@ -33,12 +34,20 @@ class Client
 
 class Server
 {
+	public:
+		class InvalidClientException : std::exception
+		{
+			public:
+				const char *what(void) throw();
+		};
+
 	private:
 		static std::vector<Client>	_v;
 
 	public:
 		static	void	addClient(Client &client);
 		static	Client	&getClient(int fd);
+		static	Client	&getClient(std::string nickname);
 
 };
 
