@@ -2,7 +2,12 @@
 
 Channel::Channel(Client *admin) : _admin(admin)
 {
+    this->_invite_only = false;
+}
 
+Channel::Channel(std::string name) : _name(name)
+{
+    this->_invite_only = false;
 }
 
 Channel::~Channel(void)
@@ -62,4 +67,14 @@ const std::string &Channel::getPermsChannel(void) const
 void    Channel::setPermsChannel(std::string perm)
 {
     this->_perms_channel = perm;
+}
+
+bool    Channel::isInviteOnly(void) const
+{
+    return this->_invite_only == true;
+}
+
+bool    Channel::operator==(const Channel &channel) const
+{
+    return this->_name == channel.getName();
 }

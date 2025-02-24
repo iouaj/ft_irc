@@ -1,96 +1,9 @@
 #include "ft_irc.hpp"
-
-// Server::Server(void) : _socket(socket(AF_INET, SOCK_STREAM, 0))
-// {
-//     sockaddr_in serverAdress;
-
-//     serverAdress.sin_family = AF_INET;
-//     serverAdress.sin_port = htons(8080);
-//     serverAdress.sin_addr.s_addr = INADDR_ANY;
-
-//     bind(this->_socket, (struct sockaddr*) &serverAdress, sizeof(serverAdress));
-
-//     if (listen(this->_socket, 5) == -1)
-//     {
-//         std::cerr << "Error fatal : listen" << std::endl;
-//         close(this->_socket);
-//     }
-// }
-
-// Server::Server(int ip) : _socket(socket(AF_INET, SOCK_STREAM, 0))
-// {
-//     sockaddr_in serverAdress;
-
-//     serverAdress.sin_family = AF_INET;
-//     serverAdress.sin_port = htons(ip);
-//     serverAdress.sin_addr.s_addr = INADDR_ANY;
-
-//     bind(this->_socket, (struct sockaddr*) &serverAdress, sizeof(serverAdress));
-
-//     if (listen(this->_socket, 5) == -1)
-//     {
-//         std::cerr << "Error fatal : listen" << std::endl;
-//         close(this->_socket);
-//     }
-// }
-
-// Server::~Server(void)
-// {
-//     close(this->_socket);
-// }
-
-// int    Server::receive(void) const
-// {
-//     std::cout << "Waiting message..." << std::endl;
-
-//     int clientSocket = accept(this->_socket, NULL, NULL);
-
-//     if (clientSocket == -1)
-//     {
-//         std::cerr << "Error fatal : accept" << std::endl;
-//         close(this->_socket);
-//         return 1;
-//     }
-
-//     this->read_socket(clientSocket);
-
-//     close(clientSocket);
-
-//     return 0;
-// }
-
-// void Server::read_socket(int clientSocket) const
-// {
-//     struct pollfd   p;
-
-//     memset(&p, 0, sizeof(p));
-
-//     p.fd = clientSocket;
-//     p.events = POLLIN;
-
-//     while (1)
-//     {
-//         if (poll(&p, 1, 10000) == -1)
-//         {
-//             std::cerr << "Timeout." << std::endl;
-//             return ;
-//         }
-
-//         std::cout << p.events << std::endl;
-//         std::cout << p.revents << std::endl;
-
-//         char buffer[1024] = {0};
-//         recv(clientSocket, buffer, sizeof(buffer), 0);
-//         std::cout << "Message from client: " << buffer << std::endl;
-
-//         std::cout << std::endl;
-
-//     }
-// }
-
 #include <algorithm>
 
 std::vector<Client> Server::_v;
+// Channel&	Server::default_channel;
+std::list<Channel> Server::_channels;
 
 void	Server::addClient(Client &client)
 {
@@ -119,6 +32,74 @@ Client	&Server::getClient(std::string nickname)
 			return *it;
 	}
 	throw InvalidClientException();
+}
+
+// const Channel &Server::getDefaultChannel(void)
+// {
+// 	const Channel &ref = Server::default_channel;
+
+// 	return ref;
+// }
+
+// void	Server::setDefaultChannel(Channel &channel)
+// {
+// 	Server::default_channel = channel;
+// }
+
+void	Server::addChannel(Channel &channel)
+{
+	Server::_channels.push_back(channel);
+}
+
+Channel	&Server::getChannel(std::string name)
+{
+	std::list<Channel>::iterator it = Server::_channels.begin();
+
+	for (; it != Server::_channels.end(); it++)
+	{
+		if (!it->getName().compare(name))
+			return *it;
+	}
+	std::cout << "not found, create new channel" << std::endl;
+	return Server::createChannel(name);
+}
+
+Channel	&Server::createChannel(std::string name)
+{
+	Channel	channel(name);
+
+	Server::_channels.push_back(channel);
+
+	return Server::getChannel(name);
+}
+
+void	Server::deleteChannel(Channel &channel)
+{
+	Server::_channels.remove(channel);
+}
+
+bool	Server::isChannelExist(std::string name)
+{
+	std::list<Channel>::iterator it = Server::_channels.begin();
+
+	for (; it != Server::_channels.end(); it++)
+	{
+		if (!it->getName().compare(name))
+			return true;
+	}
+	return false;
+}
+
+bool	Server::isClientExist(std::string name)
+{
+	std::vector<Client>::iterator	it = Server::_v.begin();
+
+	for (; it != Server::_v.end(); it++)
+	{
+		if (!it->getNickname().compare(name))
+			return true;
+	}
+	return false;
 }
 
 const char	*Server::InvalidClientException::what(void) const throw()

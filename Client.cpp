@@ -36,7 +36,23 @@ const std::string	&Client::getUsername(void) const
 	return username;
 }
 
+void	Client::setInvisible(void)
+{
+	this->_visible = false;
+}
+
+void	Client::setVisible(void)
+{
+	this->_visible = true;
+}
+
+const bool	&Client::getStatus(void)
+{
+	const bool &status = this->_visible;
+	return status;
+}
+
 bool	Client::operator==(const Client &client) const
 {
-	return this->getFd() == client.getFd() && this->getUsername() == client.getUsername();
+	return this->getFd() == client.getFd() && this->getNickname() == client.getNickname();
 }

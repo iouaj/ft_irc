@@ -13,6 +13,8 @@ std::map<std::string, int> Request::createMap(void) {
 	m["QUIT"] = 0;
 	m["CAP"] = 1;
 	m["MODE"] = 1;
+	m["PING"] = 1;
+	m["NAMES"] = 0;
 	return m;
 }
 
@@ -30,11 +32,13 @@ Request::Request(const char *buffer)
 	std::string	token;
 
 	if (!(iss >> this->command)) {
+		std::cout << "1";
 		throw InvalidRequestException();
 	}
 
 	if (validCommands.find(this->command) == validCommands.end()) {
 		throw InvalidRequestException();
+		std::cout << "2";
 	}
 
 	while (iss >> token)
@@ -44,7 +48,7 @@ Request::Request(const char *buffer)
 			std::string rest;
 
 			if (std::getline(iss, rest)) {
-				this->param.push_back(token.substr(1) + rest);
+				this->param.push_back(token + rest);
 			}
 			break;
 		}
@@ -53,6 +57,8 @@ Request::Request(const char *buffer)
 
 	int requiredParams = validCommands.at(this->command);
 	if ((int)this->param.size() < requiredParams) {
+		std::cout << "SIZE PARAM " << this->param.size() << std::endl;
+		std::cout << "3";
 		throw InvalidRequestException();
 	}
 
@@ -79,7 +85,7 @@ void	Request::nick(int client_fd) const
 
 	client.setNickname(nickname);
 
-	std::string	message(":localhost 001 " + nickname + ":Welcome\n");
+	std::string	message(":localhost 001 " + nickname + "\n");
 
 	send(client_fd, message.c_str(), message.size(), 0);
 }
@@ -87,32 +93,52 @@ void	Request::nick(int client_fd) const
 void	Request::privmsg(int client_fd) const
 {
 	Client &client = Server::getClient(client_fd);
-	// (void) client;
 
 	const std::string target_nickname = this->param[0];
 
+	std::cout << "TARGET NAME : " << target_nickname << std::endl;
+
 	if (!target_nickname.compare(0, 1, "#")) { //Channel
 
-		// if (this->param[1].c_str()[0] != ':') {
-		// 	std::cerr << "Syntax Invalide" << std::endl;
-		// 	return ;
-		// }
+		const std::string message = this->param[1].substr(1);
+		const std::string channelName = this->param[0];
 
-		const std::string message = this->param[1];
+		std::cout << "CHANNEL NAME : " << channelName << std::endl;
 
+		std::cout << "MESSAGE : " << message << std::endl;
+
+		if (Server::isChannelExist(channelName) == false) {
+			std::cout << "channel not exist" << std::endl;
+			send_error(client, ERR_CANNOTSENDTOCHAN, channelName, ":Can't send to this channel");
+			return ;
+		}
+
+		const Channel &channel = Server::getChannel(channelName);
+
+		const std::list<Client> clients = channel.getClients();
+
+		std::cout << "CLIENTS : ";
+		for (std::list<Client>::const_iterator it = clients.begin(); it != clients.end(); it++ )
+		{
+			std::cout << it->getNickname() << " ";
+		}
+		std::cout << std::endl;
+
+		send_group(channel.getClients(), ":" + client.getNickname() + " PRIVMSG " + channel.getName() + " :" + message + "\n", client);
 
 	} else { //DM
 
-		// if (this->param[1].c_str()[0] != ':') {
-		// 	std::cerr << "Syntax Invalide" << std::endl;
-		// 	return ;
-		// }
+
+		if (Server::isClientExist(target_nickname) == false) {
+			send_error(client, ERR_NOSUCHNICK, target_nickname, ":Can't find this nick");
+			return ;
+		}
 
 		Client	&target = Server::getClient(target_nickname);
 
 		const std::string message = this->param[1];
 
-		send_priv(target, client.getNickname() + " : " + message + "\n");
+		send_priv(target, ":" + client.getNickname() + " PRIVMSG " + target.getNickname() +  " :" + message + "\n");
 		// send(target.getFd(), message.c_str(), message.size(), 0);
 	}
 }
@@ -130,7 +156,72 @@ void	Request::user(int client_fd) const
 	client.setUsername(username);
 }
 
-// void	Request::mode
+void	Request::mode(int client_fd) const
+{
+	Client &client = Server::getClient(client_fd);
+
+	if (this->param[0][0] == '#' || this->param[0][0] == '@') //Channel
+	{
+
+	} else { //User
+		
+		const std::string username = this->param[0];
+
+		if (username.compare(client.getNickname()))
+		{
+			send_priv(client, ":" + toStr(SERVER_NAME) + " " + toStr(ERR_USERSDONTMATCH) + ' ' + username + ' ' + ":Users don't match");
+			return ;
+		}
+
+		for (size_t i = 1; this->param.size() > i; i++)
+		{
+			if (this->param[i].size() != 2)
+				continue;
+
+			if (this->param[i][0] != '+' && this->param[i][0] != '-')
+				continue;
+
+			if (this->param[i][1] != 'i' && this->param[i][1] != 'w' && this->param[i][1] != 's' && this->param[i][1] != 'o')
+				continue;
+
+			if (this->param[i].compare("+i"))
+			{
+				client.setInvisible();
+
+			}
+
+			send_priv(client, ":" + toStr(SERVER_NAME) + " MODE " + username + " " + this->param[i]);
+		}
+
+	}
+}
+
+void	handlePing(int client_fd)
+{
+	Client &client = Server::getClient(client_fd);
+
+	send_priv(client, ":" + toStr(SERVER_NAME) + " PONG " + toStr(SERVER_NAME));
+}
+
+void  Request::handleJoin(int client_fd) const
+{
+	Client	&client = Server::getClient(client_fd);
+
+	Channel	&channel = Server::getChannel(this->param[0]);
+
+	std::cout << "check\n" << std::endl;
+
+	if (channel.isInviteOnly()) {
+		send_priv(client, ":" + toStr(SERVER_NAME) + " " + toStr(ERR_INVITEONLYCHAN) + " " + channel.getName() + " :Channel is invite-only");
+		return ;
+	}
+
+	std::cout << "check2\n" << std::endl;
+
+	channel.addClient(client);
+
+	send_priv(client, ":" + toStr(SERVER_NAME) + " JOIN " + channel.getName());
+}
 
 void	Request::exec(int client_fd) const
 {
@@ -143,7 +234,13 @@ void	Request::exec(int client_fd) const
 		this->user(client_fd);	
 	} else if (!this->command.compare(0, 4, "CAP")) {
 		std::cout << "CAP ignored." << std::endl;
-	} else {
+	} else if (!this->command.compare("MODE")) {
+		this->mode(client_fd);
+	} else if (!this->command.compare("PING")) {
+		handlePing(client_fd);
+	} else if (!this->command.compare("JOIN")) 
+		this->handleJoin(client_fd);
+	else {
 		std::cout << "Command not found" << std::endl;
 	}
 }

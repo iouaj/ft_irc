@@ -136,6 +136,10 @@ int main (int argc, char *argv[])
 					{
 						std::cerr << e.what() << std::endl;
 					}
+					catch (const Server::InvalidClientException& e)
+					{
+						std::cerr << e.what() << std::endl;
+					}
 
 				} else {
 					// 🔌 Déconnexion du client
