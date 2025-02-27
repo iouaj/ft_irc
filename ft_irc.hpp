@@ -20,13 +20,14 @@
 
 #define SERVER_NAME	"localhost"
 
-#define ERR_USERSDONTMATCH 502
 #define ERR_NOISSUE 001
-#define ERR_INVITEONLYCHAN 473
+#define ERR_NOSUCHNICK 401
 #define ERR_CANNOTSENDTOCHAN 404
 #define ERR_NOTEXTTOSEND 412
-#define ERR_NOSUCHNICK 401
 #define ERR_NEEDMOREPARAMS 461
+#define ERR_INVITEONLYCHAN 473
+#define ERR_CHANOPRIVSNEEDED 482
+#define ERR_USERSDONTMATCH 502
 
 template <typename T> std::string toStr(T tmp)
 {
@@ -41,19 +42,18 @@ class Channel
 {
 	private:
 		std::list<Client> _clients;
-		Client	*_admin;
+		Client	*_op;
 		std::string	_name;
 		std::map<Client, std::string> _perms_client;
 		std::string	_perms_channel;
 		bool	_invite_only;
 	
 	public:
-		Channel(Client *admin);
-		Channel(std::string name);
+		Channel(Client *op, std::string name);
 		~Channel(void);
 
-		void	setAdmin(Client *admin);
-		Client	*getAdmin(void) const;
+		void	setOp(Client *admin);
+		Client	*getOp(void) const;
 
 		const std::list<Client> &getClients(void) const;
 		void	addClient(Client &Client);
@@ -66,6 +66,9 @@ class Channel
 
 		const std::string	&getPermsChannel(void) const;
 		void	setPermsChannel(std::string perms);
+
+		void kickMember(const Client &exec, const Client &target, std::string reason);
+
 
 		bool operator==(const Channel &channel) const;
 
@@ -94,6 +97,7 @@ class Client
 		const	int	&getFd(void) const;
 
 		bool operator==(const Client &client) const;
+		bool operator!=(const Client &client) const;
 };
 
 class Server

@@ -1,11 +1,6 @@
 #include "ft_irc.hpp"
 
-Channel::Channel(Client *admin) : _admin(admin)
-{
-    this->_invite_only = false;
-}
-
-Channel::Channel(std::string name) : _name(name)
+Channel::Channel(Client *op, std::string name) : _op(op), _name(name)
 {
     this->_invite_only = false;
 }
@@ -15,20 +10,20 @@ Channel::~Channel(void)
 
 }
 
-void    Channel::setAdmin(Client *admin)
+void    Channel::setOp(Client *op)
 {
-    Client *prev_admin = this->_admin;
+    Client *prev_op = this->_op;
 
-    this->_admin = admin;
+    this->_op = op;
 
-    send_priv(*prev_admin, prev_admin->getNickname() + ", you are no longer operator.\n");
+    send_priv(*prev_op, prev_op->getNickname() + ", you are no longer operator.\n");
 
-    send_priv(*admin, admin->getNickname() + ", you are now operator.");
+    send_priv(*op, op->getNickname() + ", you are now operator.");
 }
 
-Client    *Channel::getAdmin(void) const
+Client    *Channel::getOp(void) const
 {
-    return this->_admin;
+    return this->_op;
 }
 
 const std::list<Client>   &Channel::getClients(void) const
@@ -77,4 +72,21 @@ bool    Channel::isInviteOnly(void) const
 bool    Channel::operator==(const Channel &channel) const
 {
     return this->_name == channel.getName();
+}
+
+void    Channel::kickMember(const Client &exec, const Client &target, std::string reason)
+{
+    if (*this->_op != exec) {
+        send_priv(exec, ":" + toStr(SERVER_NAME) + " " + toStr(ERR_CHANOPRIVSNEEDED) + " " + this->_name + " :You're not channel operator");
+        return ;
+    }
+
+    for (std::list<Client>::iterator it = this->_clients.begin(); it != this->_clients.end(); it++)
+    {
+        if (*it == target)
+        {
+            this->_clients.remove(target);
+            send_group(this->_clients, "KICK " + this->_name + " " + target.getNickname() + (reason.empty() ? "" : " " + reason ), *this->_clients.end());
+        }
+    }
 }

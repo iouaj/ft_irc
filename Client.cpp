@@ -56,3 +56,8 @@ bool	Client::operator==(const Client &client) const
 {
 	return this->getFd() == client.getFd() && this->getNickname() == client.getNickname();
 }
+
+bool	Client::operator!=(const Client &client) const
+{
+	return this->getFd() != client.getFd() || this->getNickname() != client.getNickname();
+}
