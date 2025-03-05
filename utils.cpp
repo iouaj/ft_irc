@@ -29,11 +29,12 @@ void    send_error(const Client &client, int error, std::string arg, std::string
 
 void    send_group(const std::list<Client> &clients, std::string message, const Client &toSkip)
 {
+    std::cout << "MESSAGE : " << message << std::endl;
     for (std::list<Client>::const_iterator it = clients.begin(); it != clients.end(); it++)
     {
         if (*it == toSkip)
             continue;
-        std::cout << "Client : " << it->getNickname() << std::endl; 
+        // std::cout << "Client : " << it->getNickname() << std::endl; 
         if (send(it->getFd(), message.c_str(), message.size(), 0) == -1)
         {
             std::cerr << "Error: Message can't be send to " << it->getNickname() << std::endl;

@@ -15,6 +15,7 @@ std::map<std::string, int> Request::createMap(void) {
 	m["MODE"] = 1;
 	m["PING"] = 1;
 	m["NAMES"] = 0;
+	m["KICK"] = 2;
 	return m;
 }
 
@@ -32,13 +33,13 @@ Request::Request(const char *buffer)
 	std::string	token;
 
 	if (!(iss >> this->command)) {
-		std::cout << "1";
+		// std::cout << "1";
 		throw InvalidRequestException();
 	}
 
 	if (validCommands.find(this->command) == validCommands.end()) {
 		throw InvalidRequestException();
-		std::cout << "2";
+		// std::cout << "2";
 	}
 
 	while (iss >> token)
@@ -57,8 +58,8 @@ Request::Request(const char *buffer)
 
 	int requiredParams = validCommands.at(this->command);
 	if ((int)this->param.size() < requiredParams) {
-		std::cout << "SIZE PARAM " << this->param.size() << std::endl;
-		std::cout << "3";
+		// std::cout << "SIZE PARAM " << this->param.size() << std::endl;
+		// std::cout << "3";
 		throw InvalidRequestException();
 	}
 
@@ -96,35 +97,40 @@ void	Request::privmsg(int client_fd) const
 
 	const std::string target_nickname = this->param[0];
 
-	std::cout << "TARGET NAME : " << target_nickname << std::endl;
+	// std::cout << "TARGET NAME : " << target_nickname << std::endl;
 
 	if (!target_nickname.compare(0, 1, "#")) { //Channel
 
 		const std::string message = this->param[1].substr(1);
 		const std::string channelName = this->param[0];
 
-		std::cout << "CHANNEL NAME : " << channelName << std::endl;
+		// std::cout << "CHANNEL NAME : " << channelName << std::endl;
 
-		std::cout << "MESSAGE : " << message << std::endl;
+		// std::cout << "MESSAGE : " << message << std::endl;
 
 		if (Server::isChannelExist(channelName) == false) {
-			std::cout << "channel not exist" << std::endl;
+			// std::cout << "channel not exist" << std::endl;
 			send_error(client, ERR_CANNOTSENDTOCHAN, channelName, ":Can't send to this channel");
 			return ;
 		}
 
-		const Channel &channel = Server::getChannel(channelName);
+		const Channel *channel = Server::getChannel(channelName, &client);
 
-		const std::list<Client> clients = channel.getClients();
+		if (channel->haveClient(client) == false) {
+			send_error(client, ERR_CANNOTSENDTOCHAN, channelName, ":Can't send to this channel");
+			return ;
+		}
 
-		std::cout << "CLIENTS : ";
+		const std::list<Client> clients = channel->getClients();
+
+		// std::cout << "CLIENTS : ";
 		for (std::list<Client>::const_iterator it = clients.begin(); it != clients.end(); it++ )
 		{
 			std::cout << it->getNickname() << " ";
 		}
 		std::cout << std::endl;
 
-		send_group(channel.getClients(), ":" + client.getNickname() + " PRIVMSG " + channel.getName() + " :" + message + "\n", client);
+		send_group(clients, ":" + client.getNickname() + " PRIVMSG " + channel->getName() + " :" + message + "\n", client);
 
 	} else { //DM
 
@@ -139,16 +145,11 @@ void	Request::privmsg(int client_fd) const
 		const std::string message = this->param[1];
 
 		send_priv(target, ":" + client.getNickname() + " PRIVMSG " + target.getNickname() +  " :" + message + "\n");
-		// send(target.getFd(), message.c_str(), message.size(), 0);
 	}
 }
 
 void	Request::user(int client_fd) const
 {
-
-	// if (this->param.size() != 4)
-
-
 	Client &client = Server::getClient(client_fd);
 
 	const std::string username = this->param[0];
@@ -207,20 +208,64 @@ void  Request::handleJoin(int client_fd) const
 {
 	Client	&client = Server::getClient(client_fd);
 
-	Channel	&channel = Server::getChannel(this->param[0]);
+	Channel	*channel = Server::getChannel(this->param[0], &client);
 
-	std::cout << "check\n" << std::endl;
+	// std::cout << "check\n" << std::endl;
 
-	if (channel.isInviteOnly()) {
-		send_priv(client, ":" + toStr(SERVER_NAME) + " " + toStr(ERR_INVITEONLYCHAN) + " " + channel.getName() + " :Channel is invite-only");
+	if (channel->isInviteOnly()) {
+		send_priv(client, ":" + toStr(SERVER_NAME) + " " + toStr(ERR_INVITEONLYCHAN) + " " + channel->getName() + " :Channel is invite-only");
 		return ;
 	}
 
-	std::cout << "check2\n" << std::endl;
+	// std::cout << "check2\n" << std::endl;
 
-	channel.addClient(client);
+	channel->addClient(client);
 
-	send_priv(client, ":" + toStr(SERVER_NAME) + " JOIN " + channel.getName());
+	send_priv(client, ":" + toStr(SERVER_NAME) + " JOIN " + channel->getName());
+}
+
+void	Request::handleKick(int client_fd) const
+{
+	Client &client = Server::getClient(client_fd);
+
+	Channel	*channel = Server::getChannel(this->param[0], &client);
+
+	Client &target = Server::getClient(this->param[1]);
+
+	std::string	reason;
+	if (this->param.size() == 3 && this->param[2].size() > 1) {
+		reason = this->param[2];
+	}
+
+	channel->kickMember(client, target, reason);
+}
+
+void	Request::handlePart(int client_fd) const
+{
+	Client &client = Server::getClient(client_fd);
+
+	std::istringstream iss(this->param[0]);
+	std::string token;
+
+
+	while (iss >> token) {
+		if (Server::isChannelExist(token)) {
+			Channel *channel = Server::getChannel(token, &client);
+
+			if (channel->haveClient(client) == false) {
+				send_error(client, ERR_NOTONCHANNEL, channel->getName(), "You're not on that channel");
+				return ;
+			}
+
+			send_group(channel->getClients(), ":" + client.getNickname() + " PART " + channel->getName() + "\r\n", *channel->getClients().end());
+			channel->removeClient(client);
+			// send_priv(client, ":" + client.getNickname() + " PART " + channel->getName());
+		} else {
+			send_error(client, ERR_NOSUCHCHANNEL, token, "No such channel");
+		}
+	}
+
+
 }
 
 void	Request::exec(int client_fd) const
@@ -240,7 +285,12 @@ void	Request::exec(int client_fd) const
 		handlePing(client_fd);
 	} else if (!this->command.compare("JOIN")) 
 		this->handleJoin(client_fd);
+	else if (!this->command.compare("KICK"))
+		this->handleKick(client_fd);
+	else if (!this->command.compare("PART"))
+		this->handlePart(client_fd);
 	else {
 		std::cout << "Command not found" << std::endl;
 	}
 }
+

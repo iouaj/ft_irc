@@ -22,8 +22,10 @@
 
 #define ERR_NOISSUE 001
 #define ERR_NOSUCHNICK 401
+#define ERR_NOSUCHCHANNEL 403
 #define ERR_CANNOTSENDTOCHAN 404
 #define ERR_NOTEXTTOSEND 412
+#define ERR_NOTONCHANNEL 442
 #define ERR_NEEDMOREPARAMS 461
 #define ERR_INVITEONLYCHAN 473
 #define ERR_CHANOPRIVSNEEDED 482
@@ -63,6 +65,7 @@ class Channel
 		const std::string &getName(void) const;
 
 		bool	isInviteOnly(void) const;
+		bool	haveClient(const Client &client) const;
 
 		const std::string	&getPermsChannel(void) const;
 		void	setPermsChannel(std::string perms);
@@ -120,13 +123,14 @@ class Server
 		static	Client	&getClient(std::string nickname);
 		// const static	Channel	&getDefaultChannel(void);
 		// static void		setDefaultChannel(Channel &channel);
-		static Channel	&getChannel(std::string name);
+		static Channel	*getChannel(std::string name, Client *exec);
+		// static Channel	&getChannel(std::string name, Client *exec);
 		static	void	addChannel(Channel &channel);
 		static	void	deleteChannel(Channel &channel);
 		static	bool	isChannelExist(std::string name);
 		static	bool	isClientExist(std::string name);
 
-		static Channel	&createChannel(std::string name);
+		static Channel	*createChannel(std::string name, Client *op);
 
 };
 
@@ -157,6 +161,8 @@ class Request
 		void	user(int client_fd) const;
 		void	mode(int client_fd) const;
 		void	handleJoin(int client_fd) const;
+		void	handleKick(int client_fd) const;
+		void	handlePart(int client_fd) const;
 
 	public:
 		Request(const char *buffer);

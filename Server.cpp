@@ -51,26 +51,39 @@ void	Server::addChannel(Channel &channel)
 	Server::_channels.push_back(channel);
 }
 
-Channel	&Server::getChannel(std::string name)
+Channel	*Server::getChannel(std::string name, Client *exec)
 {
 	std::list<Channel>::iterator it = Server::_channels.begin();
 
 	for (; it != Server::_channels.end(); it++)
 	{
 		if (!it->getName().compare(name))
-			return *it;
+			return &*it;
 	}
 	std::cout << "not found, create new channel" << std::endl;
-	return Server::createChannel(name);
+	return Server::createChannel(name, exec);
 }
 
-Channel	&Server::createChannel(std::string name)
+// Channel	&Server::getChannel(std::string name, Client *exec)
+// {
+// 	std::list<Channel>::iterator it = Server::_channels.begin();
+
+// 	for (; it != Server::_channels.end(); it++)
+// 	{
+// 		if (!it->getName().compare(name))
+// 			return &*it;
+// 	}
+// 	std::cout << "not found, create new channel" << std::endl;
+// 	return Server::createChannel(name, exec);
+// }
+
+Channel	*Server::createChannel(std::string name, Client *op)
 {
-	Channel	channel(name);
+	Channel	channel(op, name);
 
 	Server::_channels.push_back(channel);
 
-	return Server::getChannel(name);
+	return Server::getChannel(name, op);
 }
 
 void	Server::deleteChannel(Channel &channel)

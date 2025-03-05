@@ -40,6 +40,9 @@ void    Channel::addClient(Client &client)
 void    Channel::removeClient(Client &client)
 {
     this->_clients.remove(client);
+
+    if (this->_clients.size() == 0)
+        Server::deleteChannel(*this);
 }
 
 void    Channel::setName(std::string name)
@@ -69,6 +72,17 @@ bool    Channel::isInviteOnly(void) const
     return this->_invite_only == true;
 }
 
+bool    Channel::haveClient(const Client &client) const
+{
+    std::list<Client>::const_iterator it = this->_clients.begin();
+
+    for (; it != this->_clients.end(); it++) {
+        if (*it == client)
+            return true;
+    }
+    return false;
+}
+
 bool    Channel::operator==(const Channel &channel) const
 {
     return this->_name == channel.getName();
@@ -83,10 +97,10 @@ void    Channel::kickMember(const Client &exec, const Client &target, std::strin
 
     for (std::list<Client>::iterator it = this->_clients.begin(); it != this->_clients.end(); it++)
     {
-        if (*it == target)
-        {
+        if (*it == target) {
+            send_group(this->_clients, "KICK " + this->_name + " " + target.getNickname() + (reason.empty() ? "\n" : " " + reason + "\n" ), *this->_clients.end());
             this->_clients.remove(target);
-            send_group(this->_clients, "KICK " + this->_name + " " + target.getNickname() + (reason.empty() ? "" : " " + reason ), *this->_clients.end());
+            return ;
         }
     }
 }
