@@ -108,7 +108,6 @@ int main (int argc, char *argv[])
 
 					std::cout << "Client add" << std::endl;
 
-					sleep(1);
 				}
 			} else {
 				// 📩 Message reçu d'un client
@@ -122,17 +121,12 @@ int main (int argc, char *argv[])
 
 						while (list.empty() == false)
 						{
-							std::cout << "- " << list.front() << std::endl;
+							std::cout << "-" << list.front() << std::endl;
 							Request req(list.front().c_str());
 
 							req.exec(events[i].data.fd);
 							list.pop_front();
 						}
-
-						// Request req(buffer);
-						// req.print();
-
-						// req.exec(events[i].data.fd);
 					}
 					catch(const Request::InvalidRequestException& e)
 					{

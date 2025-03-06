@@ -47,4 +47,6 @@ template <typename T> std::string toStr(T tmp)
 void    send_priv(const Client &client, std::string message);
 void    send_group(const std::list<Client> &clients, std::string message, const Client &toSkip);
 void    send_error(const Client &client, int error, std::string arg, std::string msg);
+
+std::string	clean_string(std::string str);
 #endif

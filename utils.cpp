@@ -31,3 +31,15 @@ void    send_group(const std::list<Client> &clients, std::string message, const 
         }
     }
 }
+
+std::string	clean_string(std::string str)
+{
+	std::string clean("");
+	for (std::size_t i = 0; i <= str.size(); i++)
+	{
+		if (std::isprint(str[i]) && str[i] != '\n' && str[i] != '\r' && str[i] != 0) {
+			clean += str[i];
+		}
+	}
+	return clean;
+}

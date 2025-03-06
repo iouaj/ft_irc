@@ -32,6 +32,7 @@ class Request
 		void	handleJoin(int client_fd) const;
 		void	handleKick(int client_fd) const;
 		void	handlePart(int client_fd) const;
+		void	handleCap(int client_fd) const;
 
 	public:
 		Request(const char *buffer);

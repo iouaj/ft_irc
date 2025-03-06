@@ -46,7 +46,7 @@ Request::Request(const char *buffer)
 			std::string rest;
 
 			if (std::getline(iss, rest)) {
-				this->param.push_back(token + rest);
+				this->param.push_back(clean_string(token.substr(1)) + clean_string(rest));
 			}
 			break;
 		}
@@ -147,7 +147,7 @@ void	Request::mode(int client_fd) const
 	{
 
 	} else { //User
-		
+
 		const std::string username = this->param[0];
 
 		if (username.compare(client.getNickname()))
@@ -189,6 +189,15 @@ void	handlePing(int client_fd)
 void  Request::handleJoin(int client_fd) const
 {
 	Client	&client = Server::getClient(client_fd);
+
+	// std::cout << "[" << this->param[0] << "]" << std::endl;
+	for (std::size_t i = 0; i < this->param[0].size(); i++) {
+		std::cout << (int)this->param[0][i] << std::endl;
+	}
+	if (this->param.empty() || this->param[0].empty()) {
+		send_error(client, ERR_NEEDMOREPARAMS, "JOIN", ":Not enough parameters");
+		return;
+	}
 
 	Channel	*channel = Server::getChannel(this->param[0], &client);
 
@@ -235,6 +244,15 @@ void	Request::handlePart(int client_fd) const
 
 }
 
+void	Request::handleCap(int client_fd) const
+{
+	Client	client = Server::getClient(client_fd);
+
+	if (!this->param[0].compare("LS")) {
+		send_priv(client, "CAP END\r\n");
+	}
+}
+
 void	Request::exec(int client_fd) const
 {
 	if (!this->command.compare(0, 5, "NICK"))
@@ -243,14 +261,15 @@ void	Request::exec(int client_fd) const
 	} else if (!this->command.compare(0, 8, "PRIVMSG")) {
 		this->privmsg(client_fd);
 	} else if (!this->command.compare(0, 5, "USER")) {
-		this->user(client_fd);	
+		this->user(client_fd);
 	} else if (!this->command.compare(0, 4, "CAP")) {
-		std::cout << "CAP ignored." << std::endl;
+		// std::cout << "CAP ignored." << std::endl;
+		this->handleCap(client_fd);
 	} else if (!this->command.compare("MODE")) {
 		this->mode(client_fd);
 	} else if (!this->command.compare("PING")) {
 		handlePing(client_fd);
-	} else if (!this->command.compare("JOIN")) 
+	} else if (!this->command.compare("JOIN"))
 		this->handleJoin(client_fd);
 	else if (!this->command.compare("KICK"))
 		this->handleKick(client_fd);

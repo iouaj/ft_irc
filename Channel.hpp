@@ -5,6 +5,9 @@
 #include <list>
 #include <map>
 #include "ft_irc.hpp"
+#include "Client.hpp"
+
+class Client;
 
 class Channel
 {
@@ -13,7 +16,7 @@ class Channel
 		Client	*_op;
 		std::string	_name;
 		bool	_invite_only;
-	
+
 	public:
 		Channel(Client *op, std::string name);
 		~Channel(void);

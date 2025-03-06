@@ -8,6 +8,8 @@
 #include "Channel.hpp"
 #include "ft_irc.hpp"
 
+class Channel;
+
 class Server
 {
 	public:
