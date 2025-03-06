@@ -106,7 +106,9 @@ int main (int argc, char *argv[])
 
 					Server::addClient(client);
 
-					// send(client_fd, "Set a nickname\n", 15, 0);
+					std::cout << "Client add" << std::endl;
+
+					sleep(1);
 				}
 			} else {
 				// 📩 Message reçu d'un client

@@ -1,8 +1,6 @@
-#include "ft_irc.hpp"
-#include <algorithm>
+#include "Server.hpp"
 
 std::vector<Client> Server::_v;
-// Channel&	Server::default_channel;
 std::list<Channel> Server::_channels;
 
 void	Server::addClient(Client &client)
@@ -34,18 +32,6 @@ Client	&Server::getClient(std::string nickname)
 	throw InvalidClientException();
 }
 
-// const Channel &Server::getDefaultChannel(void)
-// {
-// 	const Channel &ref = Server::default_channel;
-
-// 	return ref;
-// }
-
-// void	Server::setDefaultChannel(Channel &channel)
-// {
-// 	Server::default_channel = channel;
-// }
-
 void	Server::addChannel(Channel &channel)
 {
 	Server::_channels.push_back(channel);
@@ -63,19 +49,6 @@ Channel	*Server::getChannel(std::string name, Client *exec)
 	std::cout << "not found, create new channel" << std::endl;
 	return Server::createChannel(name, exec);
 }
-
-// Channel	&Server::getChannel(std::string name, Client *exec)
-// {
-// 	std::list<Channel>::iterator it = Server::_channels.begin();
-
-// 	for (; it != Server::_channels.end(); it++)
-// 	{
-// 		if (!it->getName().compare(name))
-// 			return &*it;
-// 	}
-// 	std::cout << "not found, create new channel" << std::endl;
-// 	return Server::createChannel(name, exec);
-// }
 
 Channel	*Server::createChannel(std::string name, Client *op)
 {

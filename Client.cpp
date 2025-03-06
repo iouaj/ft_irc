@@ -1,4 +1,4 @@
-#include "ft_irc.hpp"
+#include "Client.hpp"
 
 Client::Client(const std::string &nickname, const int fd) : _nickname(nickname), _socket_fd(fd)
 {
@@ -50,6 +50,12 @@ const bool	&Client::getStatus(void)
 {
 	const bool &status = this->_visible;
 	return status;
+}
+
+void	Client::sendMessage(const Client &target, const std::string &message) const
+{
+	std::string format = message + "\r\n";
+	send(target.getFd(), message.c_str(), message.size(), 0);
 }
 
 bool	Client::operator==(const Client &client) const
