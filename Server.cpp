@@ -52,9 +52,12 @@ Channel	*Server::getChannel(std::string name, Client *exec)
 
 Channel	*Server::createChannel(std::string name, Client *op)
 {
+	std::cout << "Creating..." << std::endl;
 	Channel	channel(op, name);
+	std::cout << "Create" << std::endl;
 
 	Server::_channels.push_back(channel);
+	std::cout << "Pushed" << std::endl;
 
 	return Server::getChannel(name, op);
 }

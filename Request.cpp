@@ -94,7 +94,7 @@ void	Request::privmsg(int client_fd) const
 
 	if (!target_nickname.compare(0, 1, "#")) { //Channel
 
-		const std::string message = this->param[1].substr(1, this->param[1].size() - 2);
+		const std::string message = this->param[1];
 		const std::string channelName = this->param[0];
 
 		if (Server::isChannelExist(channelName) == false) {
@@ -104,7 +104,7 @@ void	Request::privmsg(int client_fd) const
 
 		const Channel *channel = Server::getChannel(channelName, &client);
 
-		if (channel->haveClient(client) == false) {
+		if (channel->isExternalMessage() == false && channel->haveClient(client) == false) {
 			send_error(client, ERR_CANNOTSENDTOCHAN, channelName, ":Can't send to this channel");
 			return ;
 		}
@@ -112,6 +112,11 @@ void	Request::privmsg(int client_fd) const
 		const std::list<Client> clients = channel->getClients();
 
 		std::string msg = ":" + client.getNickname() + " PRIVMSG " + channel->getName() + " :" + message;
+		if (msg.size() > 510) {
+			std::cout << "Too long" << std::endl;
+			send_error(client, ERR_INPUTTOOLONG, ":Message too long, max 510 bytes.", "");
+			return;
+		}
 		channel->broadcast(msg, client);
 
 	} else { //DM
@@ -146,6 +151,62 @@ void	Request::mode(int client_fd) const
 	if (this->param[0][0] == '#' || this->param[0][0] == '@') //Channel
 	{
 
+		if (Server::isChannelExist(this->param[0]) == false) {
+			send_error(client, ERR_NOSUCHCHANNEL, this->param[0], ":No such channel");
+			return;
+		}
+
+		Channel	*channel = Server::getChannel(this->param[0], &client);
+
+		if (*channel->getOp() != client) {
+			send_error(client, ERR_CHANOPRIVSNEEDED, channel->getName(), ":You're not channel operator");
+			return;
+		}
+
+		const std::string mode = this->param[1];
+
+		switch (mode[1])
+		{
+			case 'i':
+				channel->setInviteOnly(mode[0] == '+');
+				break;
+
+			case 'k': //A revoir
+
+				if (mode.size() < 3) {
+					send_error(client, ERR_NEEDMOREPARAMS, "MODE", ":Not enough parameters");
+					return;
+				}
+
+				const std::string password = this->param[2];
+
+				if (password.size() > 20) {
+					send_error(client, ERR_PASSWDMISMATCH, client.getNickname(), ":Password is too long");
+					return;
+				}
+
+				channel->setPassword(mode[0] == '-' ? "" : password);
+				break;
+
+			case 'p':
+				channel->setPrivate(mode[0] == '+');
+				break;
+
+			case 's':
+				channel->setSecret(mode[0] == '+');
+				break;
+
+			case 't':
+				channel->setTopicOnlyOp(mode[0] == '+');
+				break;
+
+			case 'n':
+				channel->setExternalMessage(mode[0] == '+');
+			default:
+				break;
+		}
+
+		send_priv(client, ":" + client.getNickname() + " MODE " + channel->getName() + " " + this->param[1]);
 	} else { //User
 
 		const std::string username = this->param[0];
@@ -190,10 +251,6 @@ void  Request::handleJoin(int client_fd) const
 {
 	Client	&client = Server::getClient(client_fd);
 
-	// std::cout << "[" << this->param[0] << "]" << std::endl;
-	for (std::size_t i = 0; i < this->param[0].size(); i++) {
-		std::cout << (int)this->param[0][i] << std::endl;
-	}
 	if (this->param.empty() || this->param[0].empty()) {
 		send_error(client, ERR_NEEDMOREPARAMS, "JOIN", ":Not enough parameters");
 		return;
@@ -201,9 +258,21 @@ void  Request::handleJoin(int client_fd) const
 
 	Channel	*channel = Server::getChannel(this->param[0], &client);
 
+	std::cout << "yo" << std::endl;
 	if (channel->isInviteOnly()) {
-		send_error(client, ERR_INVITEONLYCHAN, channel->getName(), ": Channel is invite only");
+		std::cout << "check" << std::endl;
+		send_error(client, ERR_INVITEONLYCHAN, client.getNickname(), channel->getName() + " :Cannot join channel (+i)");
 		return ;
+	}
+	std::cout << "pass" << std::endl;
+
+	std::string	password = channel->getPassword();
+
+	if (password.empty() == false) {
+		if (this->param.size() < 2 || this->param[1].compare(password)) {
+			send_error(client, ERR_BADCHANNELKEY, client.getNickname(), channel->getName() + " :Cannot join channel (+k)");
+			return;
+		}
 	}
 
 	channel->addClient(client);
@@ -238,6 +307,10 @@ void	Request::handlePart(int client_fd) const
 		std::string msg = ":" + client.getNickname() + "!" + client.getUsername() + "@localhost" + " PART " + channel->getName() + " :Leaving";
 		channel->broadcast(msg);
 		send_priv(client, msg);
+
+		if (channel->getClients().size() == 0)
+			Server::deleteChannel(*channel);
+
 	} else {
 		send_error(client, ERR_NOSUCHCHANNEL, this->param[0], "No such channel");
 	}
@@ -249,25 +322,23 @@ void	Request::handleCap(int client_fd) const
 	Client	client = Server::getClient(client_fd);
 
 	if (!this->param[0].compare("LS")) {
-		send_priv(client, "CAP END\r\n");
+		send_priv(client, ":localhost CAP * LS :\r\n");
 	}
 }
 
 void	Request::exec(int client_fd) const
 {
 	if (!this->command.compare(0, 5, "NICK"))
-	{
 		this->nick(client_fd);
-	} else if (!this->command.compare(0, 8, "PRIVMSG")) {
+	else if (!this->command.compare(0, 8, "PRIVMSG")) {
 		this->privmsg(client_fd);
 	} else if (!this->command.compare(0, 5, "USER")) {
 		this->user(client_fd);
-	} else if (!this->command.compare(0, 4, "CAP")) {
-		// std::cout << "CAP ignored." << std::endl;
+	} else if (!this->command.compare(0, 4, "CAP"))
 		this->handleCap(client_fd);
-	} else if (!this->command.compare("MODE")) {
+	else if (!this->command.compare("MODE"))
 		this->mode(client_fd);
-	} else if (!this->command.compare("PING")) {
+	else if (!this->command.compare("PING")) {
 		handlePing(client_fd);
 	} else if (!this->command.compare("JOIN"))
 		this->handleJoin(client_fd);

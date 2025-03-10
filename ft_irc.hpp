@@ -31,9 +31,12 @@
 #define ERR_NOSUCHCHANNEL 403
 #define ERR_CANNOTSENDTOCHAN 404
 #define ERR_NOTEXTTOSEND 412
+#define ERR_INPUTTOOLONG 417
 #define ERR_NOTONCHANNEL 442
 #define ERR_NEEDMOREPARAMS 461
+#define ERR_PASSWDMISMATCH 464
 #define ERR_INVITEONLYCHAN 473
+#define ERR_BADCHANNELKEY 475
 #define ERR_CHANOPRIVSNEEDED 482
 #define ERR_USERSDONTMATCH 502
 
@@ -47,6 +50,8 @@ template <typename T> std::string toStr(T tmp)
 void    send_priv(const Client &client, std::string message);
 void    send_group(const std::list<Client> &clients, std::string message, const Client &toSkip);
 void    send_error(const Client &client, int error, std::string arg, std::string msg);
+// void	sendMessage(const Client	&client, std::string message);
+void	sendMessage(const Client &sender, const Client	&target, std::string message);
 
 std::string	clean_string(std::string str);
 #endif

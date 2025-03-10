@@ -37,12 +37,9 @@ void    Channel::addClient(Client &client)
     this->_clients.push_back(client);
 }
 
-void    Channel::removeClient(Client &client)
+void	Channel::removeClient(Client &client)
 {
-    this->_clients.remove(client);
-
-    if (this->_clients.size() == 0)
-        Server::deleteChannel(*this);
+	this->_clients.remove(client);
 }
 
 void    Channel::setName(std::string name)
@@ -59,6 +56,62 @@ const std::string   &Channel::getName(void) const
 bool    Channel::isInviteOnly(void) const
 {
     return this->_invite_only == true;
+}
+
+void	Channel::setInviteOnly(bool status)
+{
+	this->_invite_only = status;
+}
+
+const std::string	&Channel::getPassword(void) const
+{
+	const std::string &password = this->_password;
+	return password;
+}
+
+void	Channel::setPassword(std::string password)
+{
+	this->_password = password;
+}
+
+void	Channel::setPrivate(bool status)
+{
+	this->_private = status;
+}
+
+bool	Channel::isPrivate(void) const
+{
+	return this->_private == true;
+}
+
+void	Channel::setSecret(bool status)
+{
+	this->_secret = status;
+}
+
+bool	Channel::isSecret(void) const
+{
+	return this->_secret == true;
+}
+
+bool	Channel::isTopicOnlyOp(void) const
+{
+	return this->_topic_only_op == true;
+}
+
+void	Channel::setTopicOnlyOp(bool status)
+{
+	this->_topic_only_op = status;
+}
+
+void	Channel::setExternalMessage(bool status)
+{
+	this->_external_message = status;
+}
+
+bool	Channel::isExternalMessage(void) const
+{
+	return this->_external_message == true;
 }
 
 bool    Channel::haveClient(const Client &client) const

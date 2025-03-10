@@ -16,6 +16,11 @@ class Channel
 		Client	*_op;
 		std::string	_name;
 		bool	_invite_only;
+		bool	_private;
+		bool	_secret;
+		bool	_topic_only_op;
+		bool	_external_message;
+		std::string	_password;
 
 	public:
 		Channel(Client *op, std::string name);
@@ -32,6 +37,23 @@ class Channel
 		const std::string &getName(void) const;
 
 		bool	isInviteOnly(void) const;
+		void	setInviteOnly(bool status);
+
+		const std::string	&getPassword(void) const;
+		void	setPassword(std::string password);
+
+		void	setPrivate(bool status);
+		bool	isPrivate(void) const;
+
+		void	setSecret(bool status);
+		bool	isSecret(void) const;
+
+		void	setTopicOnlyOp(bool status);
+		bool	isTopicOnlyOp(void) const;
+
+		void	setExternalMessage(bool status);
+		bool	isExternalMessage(void) const;
+
 		bool	haveClient(const Client &client) const;
 
 		void	broadcast(std::string message) const;

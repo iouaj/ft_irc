@@ -32,6 +32,19 @@ void    send_group(const std::list<Client> &clients, std::string message, const 
     }
 }
 
+void	sendMessage(const Client &sender, const Client	&target, std::string message)
+{
+	message = message+ "\r\n";
+	if (message.size() > 512) {
+		send_error(sender, ERR_INPUTTOOLONG, "", ":Message too long, max 510 bytes.");
+		return;
+	}
+
+	if (send(target.getFd(), message.c_str(), message.size(), 0) == -1) {
+		std::cerr << "Error: Message can't be send" << std::endl;
+	}
+}
+
 std::string	clean_string(std::string str)
 {
 	std::string clean("");
