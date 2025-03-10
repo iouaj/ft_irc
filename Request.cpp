@@ -102,14 +102,17 @@ void	Request::privmsg(int client_fd) const
 			return ;
 		}
 
-		const Channel *channel = Server::getChannel(channelName, &client);
+		const Channel *channel = Server::getChannel(channelName, client);
 
 		if (channel->isExternalMessage() == false && channel->haveClient(client) == false) {
-			send_error(client, ERR_CANNOTSENDTOCHAN, channelName, ":Can't send to this channel");
+			send_error(client, ERR_CANNOTSENDTOCHAN, channelName, ":Can't send to this channel (+n)");
 			return ;
 		}
 
-		const std::list<Client> clients = channel->getClients();
+		if (channel->isModerated() && channel->hasClientVoice(client) == false && channel->isOp(client) == false) {
+			send_error(client, ERR_CANNOTSENDTOCHAN, channelName, ":Can't send to this channel (+m)");
+			return ;
+		}
 
 		std::string msg = ":" + client.getNickname() + " PRIVMSG " + channel->getName() + " :" + message;
 		if (msg.size() > 510) {
@@ -156,14 +159,15 @@ void	Request::mode(int client_fd) const
 			return;
 		}
 
-		Channel	*channel = Server::getChannel(this->param[0], &client);
+		Channel	*channel = Server::getChannel(this->param[0], client);
 
-		if (*channel->getOp() != client) {
+		if (channel->isOp(client) == false) {
 			send_error(client, ERR_CHANOPRIVSNEEDED, channel->getName(), ":You're not channel operator");
 			return;
 		}
 
 		const std::string mode = this->param[1];
+		const std::string arg = this->param.size() > 2 ? this->param[2] : "";
 
 		switch (mode[1])
 		{
@@ -173,19 +177,17 @@ void	Request::mode(int client_fd) const
 
 			case 'k': //A revoir
 
-				if (mode.size() < 3) {
+				if (arg.empty()) {
 					send_error(client, ERR_NEEDMOREPARAMS, "MODE", ":Not enough parameters");
 					return;
 				}
 
-				const std::string password = this->param[2];
-
-				if (password.size() > 20) {
+				if (arg.size() > 20) {
 					send_error(client, ERR_PASSWDMISMATCH, client.getNickname(), ":Password is too long");
 					return;
 				}
 
-				channel->setPassword(mode[0] == '-' ? "" : password);
+				channel->setPassword(mode[0] == '-' ? "" : arg);
 				break;
 
 			case 'p':
@@ -202,11 +204,67 @@ void	Request::mode(int client_fd) const
 
 			case 'n':
 				channel->setExternalMessage(mode[0] == '+');
+				break;
+
+			case 'm':
+				channel->setModerated(mode[0] == '+');
+				break;
+
+			case 'v': {
+
+				if (arg.empty()) {
+					send_error(client, ERR_NEEDMOREPARAMS, "MODE", ":Not enough parameters");
+					return;
+				}
+
+				if (Server::isClientExist(arg) == false) {
+					send_error(client, ERR_USERNOTINCHANNEL, arg, channel->getName() + " :They aren't on that channel");
+					return;
+				}
+
+				const Client &target = Server::getClient(arg);
+
+				if (channel->haveClient(target) == false) {
+					send_error(client, ERR_USERNOTINCHANNEL, target.getNickname(), channel->getName() + " :They aren't on that channel");
+					return;
+				}
+
+				mode[0] == '+' ? channel->addVoice(target) : channel->removeVoice(target);
+
+				std::string msg = ":" + client.getNickname() + " MODE " + channel->getName() + " " + mode + " " + target.getNickname();
+				channel->broadcast(msg);
+				return;
+			}
+
+			case 'o': {
+				if (arg.empty()) {
+					send_error(client, ERR_NEEDMOREPARAMS, "MODE", ":Not enough parameters");
+					return;
+				}
+
+				if (Server::isClientExist(arg) == false) {
+					send_error(client, ERR_USERNOTINCHANNEL, arg, channel->getName() + " :They aren't on that channel");
+					return;
+				}
+
+				const Client &target = Server::getClient(arg);
+
+				if (channel->haveClient(target) == false) {
+					send_error(client, ERR_USERNOTINCHANNEL, target.getNickname(), channel->getName() + " :They aren't on that channel");
+					return;
+				}
+
+				mode[0] == '+' ? channel->addOp(target) : channel->removeOp(target);
+
+				std::string msg = ":" + client.getNickname() + " MODE " + channel->getName() + " " + mode + " " + target.getNickname();
+				channel->broadcast(msg);
+				return;
+			}
 			default:
 				break;
 		}
 
-		send_priv(client, ":" + client.getNickname() + " MODE " + channel->getName() + " " + this->param[1]);
+		send_priv(client, ":" + client.getNickname() + " MODE " + channel->getName() + " " + mode);
 	} else { //User
 
 		const std::string username = this->param[0];
@@ -256,15 +314,12 @@ void  Request::handleJoin(int client_fd) const
 		return;
 	}
 
-	Channel	*channel = Server::getChannel(this->param[0], &client);
+	Channel	*channel = Server::getChannel(this->param[0], client);
 
-	std::cout << "yo" << std::endl;
 	if (channel->isInviteOnly()) {
-		std::cout << "check" << std::endl;
 		send_error(client, ERR_INVITEONLYCHAN, client.getNickname(), channel->getName() + " :Cannot join channel (+i)");
 		return ;
 	}
-	std::cout << "pass" << std::endl;
 
 	std::string	password = channel->getPassword();
 
@@ -283,7 +338,7 @@ void  Request::handleJoin(int client_fd) const
 void	Request::handleKick(int client_fd) const
 {
 	Client &client = Server::getClient(client_fd);
-	Channel	*channel = Server::getChannel(this->param[0], &client);
+	Channel	*channel = Server::getChannel(this->param[0], client);
 	Client &target = Server::getClient(this->param[1]);
 
 	std::string	reason = ":No reason";
@@ -296,7 +351,7 @@ void	Request::handlePart(int client_fd) const
 	Client &client = Server::getClient(client_fd);
 
 	if (Server::isChannelExist(this->param[0])) {
-		Channel *channel = Server::getChannel(this->param[0], &client);
+		Channel *channel = Server::getChannel(this->param[0], client);
 
 		if (channel->haveClient(client) == false) {
 			send_error(client, ERR_NOTONCHANNEL, channel->getName(), "You're not on that channel");

@@ -37,7 +37,7 @@ void	Server::addChannel(Channel &channel)
 	Server::_channels.push_back(channel);
 }
 
-Channel	*Server::getChannel(std::string name, Client *exec)
+Channel	*Server::getChannel(std::string name, const Client &exec)
 {
 	std::list<Channel>::iterator it = Server::_channels.begin();
 
@@ -50,14 +50,11 @@ Channel	*Server::getChannel(std::string name, Client *exec)
 	return Server::createChannel(name, exec);
 }
 
-Channel	*Server::createChannel(std::string name, Client *op)
+Channel	*Server::createChannel(std::string name, const Client &op)
 {
-	std::cout << "Creating..." << std::endl;
 	Channel	channel(op, name);
-	std::cout << "Create" << std::endl;
 
 	Server::_channels.push_back(channel);
-	std::cout << "Pushed" << std::endl;
 
 	return Server::getChannel(name, op);
 }

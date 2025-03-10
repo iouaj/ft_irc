@@ -13,21 +13,26 @@ class Channel
 {
 	private:
 		std::list<Client> _clients;
-		Client	*_op;
+		// Client	*_op;
 		std::string	_name;
 		bool	_invite_only;
 		bool	_private;
 		bool	_secret;
 		bool	_topic_only_op;
 		bool	_external_message;
+		bool	_moderated;
 		std::string	_password;
+		std::list<Client>	_voice;
+		std::list<Client>	_op;
 
 	public:
-		Channel(Client *op, std::string name);
+		Channel(const Client &op, std::string name);
 		~Channel(void);
 
-		void	setOp(Client *admin);
-		Client	*getOp(void) const;
+		void	addOp(const Client &client);
+		void	removeOp(const Client &client);
+		bool	isOp(const Client &client) const;
+		// Client	*getOp(void) const;
 
 		const std::list<Client> &getClients(void) const;
 		void	addClient(Client &Client);
@@ -53,6 +58,13 @@ class Channel
 
 		void	setExternalMessage(bool status);
 		bool	isExternalMessage(void) const;
+
+		void	addVoice(const Client &client);
+		void	removeVoice(const Client &client);
+		bool	hasClientVoice(const Client &client) const;
+
+		void	setModerated(bool status);
+		bool	isModerated(void) const;
 
 		bool	haveClient(const Client &client) const;
 

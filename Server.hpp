@@ -27,13 +27,13 @@ class Server
 		static	void	addClient(Client &client);
 		static	Client	&getClient(int fd);
 		static	Client	&getClient(std::string nickname);
-		static Channel	*getChannel(std::string name, Client *exec);
+		static Channel	*getChannel(std::string name, const Client &exec);
 		static	void	addChannel(Channel &channel);
 		static	void	deleteChannel(Channel &channel);
 		static	bool	isChannelExist(std::string name);
 		static	bool	isClientExist(std::string name);
 
-		static Channel	*createChannel(std::string name, Client *op);
+		static Channel	*createChannel(std::string name, const Client &op);
 
 };
 
