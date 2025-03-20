@@ -16,17 +16,11 @@ class Request
 		};
 
 	private:
-		static std::map<std::string, int> createMap(void);
-
-		static const std::map<std::string, int> validCommands;
-
-		std::string	str;
-
-		std::string	command;
+		std::string					command;
 		std::vector<std::string>	param;
 
 		void	handleNick(int client_fd) const;
-		void	privmsg(int client_fd) const;
+		void	handlePrivmsg(int client_fd) const;
 		void	handleUser(int client_fd) const;
 		void	handleMode(int client_fd) const;
 		void	handleJoin(int client_fd) const;
@@ -37,15 +31,13 @@ class Request
 		void	handleTopic(int client_fd) const;
 		void	handleQuit(int client_fd) const;
 		void	handlePass(int client_fd) const;
+		void	handlePing(int client_fd) const;
 
 	public:
 		Request(const char *buffer);
 		~Request(void);
 
 		void	exec(int client_fd) const;
-
-		void print(void) const;
-
 };
 
 #endif

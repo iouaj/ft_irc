@@ -51,7 +51,6 @@ Channel	*Server::getChannel(std::string name, const Client &exec)
 		if (!it->getName().compare(name))
 			return &*it;
 	}
-	std::cout << "not found, create new channel" << std::endl;
 	return Server::createChannel(name, exec);
 }
 
@@ -166,7 +165,6 @@ void	Server::shutdown_server()
 {
 	std::vector<Client>::iterator	it = Server::_v.begin();
 	std::string	msg = "ERROR: Server shutting down\r\n";
-
 
 	for (; it != Server::_v.end(); it++)
 	{

@@ -57,6 +57,7 @@ void	Client::setup(void)
 {
 	this->_setup = true;
 	sendServer(*this, RPL_WELCOME(this->getNickname()));
+	std::cout << this->_nickname << "!" << this->_username << "@localhost registered" << std::endl;
 }
 
 bool	Client::isSetup(void) const
@@ -76,9 +77,7 @@ bool	Client::isPass(void) const
 
 void	Client::incrInvalidRequest(void)
 {
-	std::cout << this->_invalid_request << std::endl;
 	this->_invalid_request += 1;
-	std::cout << this->_invalid_request << std::endl;
 }
 
 const int	&Client::getInvalidRequest(void) const
@@ -101,8 +100,8 @@ void	Client::sendEverywhere(const std::string &message) const
 
 void	Client::sendMessage(const Client &target, const std::string &message) const
 {
-	std::string format = message + "\r\n";
-	send(target.getFd(), message.c_str(), message.size(), 0);
+	std::string request = ":" + this->getNickname() + " PRIVMSG " + target.getNickname() + " :" + message + "\r\n";
+	send(target.getFd(), request.c_str(), request.size(), 0);
 }
 
 bool	Client::operator==(const Client &client) const

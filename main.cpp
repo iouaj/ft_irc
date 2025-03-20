@@ -100,18 +100,14 @@ int main (int argc, char *argv[])
 
 	struct epoll_event events[10];
 
-	std::cout << "Serveur en écoute sur le port " << 8080 << "..." << std::endl;
-
-	std::cout << "Socker Server " << socketServer << std::endl;
+	std::cout << "Server listening on " << port << "..." << std::endl;
 
 	while (true)
 	{
-
 		int num_events = epoll_wait(epoll_fd, events, 10, -1);
 
 		for (int i = 0; i < num_events; i++) {
-			if (events[i].data.fd == socketServer) {
-				// 🆕 Nouveau client
+			if (events[i].data.fd == socketServer) { // Nouveau client
 
 				sockaddr_in client_addr;
 				socklen_t client_len = sizeof(client_addr);
@@ -123,29 +119,25 @@ int main (int argc, char *argv[])
 					event.data.fd = client_fd;
 					epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &event);
 
-					std::cout << "Nouvelle connexion acceptée." << std::endl;
+					std::cout << "New connexion accepted." << std::endl;
 
 					Client	client("", client_fd);
 
 					Server::addClient(client);
-
-					std::cout << "Client add" << std::endl;
-
 				}
-			} else {
-				// 📩 Message reçu d'un client
+			} else { //Message reçu d'un client
 				char buffer[1024];
+
 				int bytes_read = recv(events[i].data.fd, buffer, sizeof(buffer), 0);
 				if (bytes_read > 0) {
 					buffer[bytes_read] = 0;
+					std::cout << buffer << std::endl;
 					std::list<std::string> list = split(buffer);
 
 					while (list.empty() == false)
 					{
-						std::cout << "-" << list.front() << std::endl;
-						Request req(list.front().c_str());
-
 						try {
+							Request req(list.front().c_str());
 							req.exec(events[i].data.fd);
 						}
 						catch(const Request::InvalidRequestException& e)
@@ -159,10 +151,13 @@ int main (int argc, char *argv[])
 
 						list.pop_front();
 					}
-				} else {
-					// 🔌 Déconnexion du client
-					std::cout << Server::getClient(events[i].data.fd).getNickname() << " disconnected." << std::endl;
-					Server::removeClient(Server::getClient(events[i].data.fd));
+				} else { //Deconnexion du Client
+					try {
+						std::cout << Server::getClient(events[i].data.fd).getNickname() << " disconnected." << std::endl;
+						Server::removeClient(Server::getClient(events[i].data.fd));
+					}
+					catch (const Server::InvalidClientException& e)
+					{}
 					close(events[i].data.fd);
 				}
 			}
