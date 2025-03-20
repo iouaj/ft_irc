@@ -18,7 +18,7 @@ std::list<std::string> split(std::string str)
 
 int main (int argc, char *argv[])
 {
-	if (argc != 2)
+	if (argc != 3)
 	{
 		std::cerr << "Error: Missing arguments" << std::endl;
 		return 1;
@@ -34,12 +34,32 @@ int main (int argc, char *argv[])
 		}
 	}
 
+	std::string	password(argv[2]);
+	for (std::size_t i = 0; i < password.size(); i++)
+	{
+		if (!std::isprint(password[i]))
+		{
+			std::cerr << "Error: Invalid Password" << std::endl;
+			return 1;
+		}
+	}
+
+	if (password.size() > 20) {
+		std::cerr << "Error: Password too long" << std::endl;
+		return 1;
+	}
+
+	Server::setPassword(password);
+
 	int socketServer = socket(AF_INET, SOCK_STREAM, 0);
 	if (socketServer == -1)
 	{
 		std::cerr << "Error: socket" << std::endl;
 		return 1;
 	}
+
+	setSignal();
+	Server::setServerSocket(socketServer);
 
 	struct sockaddr_in	server_addr;
 
@@ -50,6 +70,7 @@ int main (int argc, char *argv[])
 	if (bind(socketServer, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1)
 	{
 		std::cerr << "Error: bind socket" << std::endl;
+		close(socketServer);
 		return 1;
 	}
 
@@ -67,6 +88,8 @@ int main (int argc, char *argv[])
 		std::cerr << "Error: epoll" << std::endl;
 		return 1;
 	}
+
+	Server::setEpollFd(epoll_fd);
 
 	struct epoll_event event;
 
@@ -102,7 +125,7 @@ int main (int argc, char *argv[])
 
 					std::cout << "Nouvelle connexion acceptée." << std::endl;
 
-					Client	client("none", client_fd);
+					Client	client("", client_fd);
 
 					Server::addClient(client);
 
@@ -114,32 +137,32 @@ int main (int argc, char *argv[])
 				char buffer[1024];
 				int bytes_read = recv(events[i].data.fd, buffer, sizeof(buffer), 0);
 				if (bytes_read > 0) {
-					try
+					buffer[bytes_read] = 0;
+					std::list<std::string> list = split(buffer);
+
+					while (list.empty() == false)
 					{
-						buffer[bytes_read] = 0;
-						std::list<std::string> list = split(buffer);
+						std::cout << "-" << list.front() << std::endl;
+						Request req(list.front().c_str());
 
-						while (list.empty() == false)
-						{
-							std::cout << "-" << list.front() << std::endl;
-							Request req(list.front().c_str());
-
+						try {
 							req.exec(events[i].data.fd);
-							list.pop_front();
 						}
-					}
-					catch(const Request::InvalidRequestException& e)
-					{
-						std::cerr << e.what() << std::endl;
-					}
-					catch (const Server::InvalidClientException& e)
-					{
-						std::cerr << e.what() << std::endl;
-					}
+						catch(const Request::InvalidRequestException& e)
+						{
+							std::cerr << e.what() << std::endl;
+						}
+						catch (const Server::InvalidClientException& e)
+						{
+							std::cerr << e.what() << std::endl;
+						}
 
+						list.pop_front();
+					}
 				} else {
 					// 🔌 Déconnexion du client
 					std::cout << Server::getClient(events[i].data.fd).getNickname() << " disconnected." << std::endl;
+					Server::removeClient(Server::getClient(events[i].data.fd));
 					close(events[i].data.fd);
 				}
 			}

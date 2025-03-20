@@ -16,6 +16,9 @@ std::map<std::string, int> Request::createMap(void) {
 	m["PING"] = 1;
 	m["NAMES"] = 0;
 	m["KICK"] = 2;
+	m["INVITE"] = 2;
+	m["TOPIC"] = 1;
+	m["PASS"] = 1;
 	return m;
 }
 
@@ -71,19 +74,56 @@ void	Request::print(void) const
 	std::cout << std::endl;
 }
 
-void	Request::nick(int client_fd) const
+bool	isNickValid(const std::string &nickname) {
+
+	if (nickname.empty())
+		return false;
+
+	for (std::size_t i = 0; i < nickname.size(); i++)
+	{
+		if (std::isalpha(nickname[i]) == false)
+			return false;
+	}
+
+	return nickname.size() <= 20;
+}
+
+void	Request::handleNick(int client_fd) const
 {
 	Client	&client = Server::getClient(client_fd);
+
+	if (client.isPass() == false) {
+		sendServer(client, ERR_NOTREGISTERED);
+		client.incrInvalidRequest();
+		return;
+	}
 
 	std::string	nickname;
 
 	nickname = this->param[0];
 
+	if (isNickValid(nickname) == false) {
+		sendServer(client, ERR_ERRONEUSNICKNAME(client.getNickname().empty() ? "*" : client.getNickname(), nickname));
+		client.incrInvalidRequest();
+		return;
+	}
+
+	if (Server::isClientExist(nickname)) {
+		sendServer(client, ERR_NICKNAMEINUSE(client.getNickname().empty() ? "*" : client.getNickname(), nickname));
+		client.incrInvalidRequest();
+		return;
+	}
+
+	if (client.isSetup() == false) {
+		client.setNickname(nickname);
+		return;
+	}
+
+	std::string msg = ":" + client.getNickname() + " NICK " + nickname;
+
 	client.setNickname(nickname);
 
-	std::string	message(":localhost 001 " + nickname + "\n");
-
-	send(client_fd, message.c_str(), message.size(), 0);
+	client.sendEverywhere(msg);
 }
 
 void	Request::privmsg(int client_fd) const
@@ -126,7 +166,7 @@ void	Request::privmsg(int client_fd) const
 
 
 		if (Server::isClientExist(target_nickname) == false) {
-			send_error(client, ERR_NOSUCHNICK, target_nickname, ":Can't find this nick");
+			sendServer(client, ERR_NOSUCHNICK(client.getNickname(), target_nickname));
 			return ;
 		}
 
@@ -138,31 +178,70 @@ void	Request::privmsg(int client_fd) const
 	}
 }
 
-void	Request::user(int client_fd) const
+bool	isUsernameValid(const std::string username)
+{
+	if (username.empty())
+		return false;
+	for (std::size_t i = 0; i < username.size(); i++)
+	{
+		char c = username[i];
+		if ((std::isalnum(c) || c == '-' || c == '_') == false)
+			return false;
+	}
+	return username.size();
+}
+
+void	Request::handleUser(int client_fd) const
 {
 	Client &client = Server::getClient(client_fd);
 
+	if (client.getNickname().empty() || client.isPass() == false) {
+		sendServer(client, ERR_NOTREGISTERED);
+		client.incrInvalidRequest();
+		return;
+	}
+
+	if (client.getUsername().empty() == false) {
+		sendServer(client, ERR_ALREADYREGISTRED(client.getNickname()));
+		return;
+	}
+
 	const std::string username = this->param[0];
 
+	if (isUsernameValid(username) == false) {
+		sendServer(client, ERR_NEEDMOREPARAM(client.getNickname(), "USER"));
+		client.incrInvalidRequest();
+		return;
+	}
+
 	client.setUsername(username);
+
+	client.setup();
 }
 
-void	Request::mode(int client_fd) const
+void	Request::handleMode(int client_fd) const
 {
 	Client &client = Server::getClient(client_fd);
 
 	if (this->param[0][0] == '#' || this->param[0][0] == '@') //Channel
 	{
 
-		if (Server::isChannelExist(this->param[0]) == false) {
-			send_error(client, ERR_NOSUCHCHANNEL, this->param[0], ":No such channel");
+		const std::string	channel_name = this->param[0];
+
+		if (Server::isChannelExist(channel_name) == false) {
+			sendServer(client, ERR_NOSUCHCHANNEL(client.getNickname(), channel_name));
 			return;
 		}
 
-		Channel	*channel = Server::getChannel(this->param[0], client);
+		Channel	*channel = Server::getChannel(channel_name, client);
+
+		if (this->param.size() < 2) { //Ask Channel's mode
+			channel->sendMode(client);
+			return;
+		}
 
 		if (channel->isOp(client) == false) {
-			send_error(client, ERR_CHANOPRIVSNEEDED, channel->getName(), ":You're not channel operator");
+			sendServer(client, ERR_CHANOPRIVSNEEDED(client.getNickname(), channel_name));
 			return;
 		}
 
@@ -178,12 +257,18 @@ void	Request::mode(int client_fd) const
 			case 'k': //A revoir
 
 				if (arg.empty()) {
-					send_error(client, ERR_NEEDMOREPARAMS, "MODE", ":Not enough parameters");
+					// send_error(client, ERR_NEEDMOREPARAMS, channel->getName(), ":Not enough parameters");
+					// std::string msg = ":localhost " + toStr(ERR_NEEDMOREPARAMS) + " MODE " + channel->getName() + " +k" + " :Invalid Parameters";
+
+					// sendTest(client, ERR_NEEDMOREPARAM(client.getNickname(), "MODE " + channel->getName() + " +k"));
+					sendServer(client, ERR_NEEDMOREPARAM(client.getNickname(), "MODE"));
+					// send_priv(client, msg);
+
 					return;
 				}
 
 				if (arg.size() > 20) {
-					send_error(client, ERR_PASSWDMISMATCH, client.getNickname(), ":Password is too long");
+					sendServer(client, ERR_PASSWDMISMATCH(client.getNickname()));
 					return;
 				}
 
@@ -218,14 +303,14 @@ void	Request::mode(int client_fd) const
 				}
 
 				if (Server::isClientExist(arg) == false) {
-					send_error(client, ERR_USERNOTINCHANNEL, arg, channel->getName() + " :They aren't on that channel");
+					sendServer(client, ERR_USERNOTINCHANNEL(client.getNickname(), arg, channel->getName()));
 					return;
 				}
 
-				const Client &target = Server::getClient(arg);
+				Client &target = Server::getClient(arg);
 
 				if (channel->haveClient(target) == false) {
-					send_error(client, ERR_USERNOTINCHANNEL, target.getNickname(), channel->getName() + " :They aren't on that channel");
+					sendServer(client, ERR_USERNOTINCHANNEL(client.getNickname(), target.getNickname(), channel->getName()));
 					return;
 				}
 
@@ -243,14 +328,14 @@ void	Request::mode(int client_fd) const
 				}
 
 				if (Server::isClientExist(arg) == false) {
-					send_error(client, ERR_USERNOTINCHANNEL, arg, channel->getName() + " :They aren't on that channel");
+					sendServer(client, ERR_USERNOTINCHANNEL(client.getNickname(), arg, channel->getName()));
 					return;
 				}
 
-				const Client &target = Server::getClient(arg);
+				Client &target = Server::getClient(arg);
 
 				if (channel->haveClient(target) == false) {
-					send_error(client, ERR_USERNOTINCHANNEL, target.getNickname(), channel->getName() + " :They aren't on that channel");
+					sendServer(client, ERR_USERNOTINCHANNEL(client.getNickname(), target.getNickname(), channel->getName()));
 					return;
 				}
 
@@ -259,6 +344,58 @@ void	Request::mode(int client_fd) const
 				std::string msg = ":" + client.getNickname() + " MODE " + channel->getName() + " " + mode + " " + target.getNickname();
 				channel->broadcast(msg);
 				return;
+			}
+
+			case 'b': {
+				if (arg.empty()) {
+					send_error(client, ERR_NEEDMOREPARAMS, "MODE", ":Not enough parameters");
+					return;
+				}
+
+				if (Server::isClientExist(arg) == false) {
+					sendServer(client, ERR_USERNOTINCHANNEL(client.getNickname(), arg, channel->getName()));
+					return;
+				}
+
+				Client &target = Server::getClient(arg);
+
+				if (channel->haveClient(target) == false) {
+					sendServer(client, ERR_USERNOTINCHANNEL(client.getNickname(), arg, channel->getName()));
+					return;
+				}
+
+				mode[0] == '+' ? channel->addBanList(client) : channel->removeBanList(client);
+				std::string msg = ":" + client.getNickname() + " MODE " + channel->getName() + " " + mode + " " + target.getNickname();
+				channel->broadcast(msg);
+				return;
+			}
+
+			case 'l': {
+
+				if (mode[0] == '-') {
+					channel->setLimit(0);
+					break;
+				}
+
+				if (arg.empty()) {
+					send_error(client, ERR_NEEDMOREPARAMS, "MODE", ":Not enough parameters");
+					return;
+				}
+
+				if (isNumericString(arg) == false) {
+					send_error(client, ERR_INVALIDMODEPARAM, arg, " :Invalid parameter");
+					return;
+				}
+
+				int	limit = std::atoi(arg.c_str());
+
+				if (limit > MAX_LIMIT_MEMBER_CHANNEL || limit <= 0) {
+					send_error(client, ERR_INVALIDMODEPARAM, arg, ":Invalid parameter");
+					return;
+				}
+
+				channel->setLimit(limit);
+
 			}
 			default:
 				break;
@@ -271,7 +408,7 @@ void	Request::mode(int client_fd) const
 
 		if (username.compare(client.getNickname()))
 		{
-			send_priv(client, ":" + toStr(SERVER_NAME) + " " + toStr(ERR_USERSDONTMATCH) + ' ' + username + ' ' + ":Users don't match");
+			sendServer(client, ERR_USERSDONTMATCH(client.getNickname()));
 			return ;
 		}
 
@@ -289,7 +426,6 @@ void	Request::mode(int client_fd) const
 			if (this->param[i].compare("+i"))
 			{
 				client.setInvisible();
-
 			}
 
 			send_priv(client, ":" + toStr(SERVER_NAME) + " MODE " + username + " " + this->param[i]);
@@ -310,51 +446,98 @@ void  Request::handleJoin(int client_fd) const
 	Client	&client = Server::getClient(client_fd);
 
 	if (this->param.empty() || this->param[0].empty()) {
-		send_error(client, ERR_NEEDMOREPARAMS, "JOIN", ":Not enough parameters");
+		sendServer(client, ERR_NEEDMOREPARAM(client.getNickname(), "JOIN"));
 		return;
 	}
 
 	Channel	*channel = Server::getChannel(this->param[0], client);
 
-	if (channel->isInviteOnly()) {
-		send_error(client, ERR_INVITEONLYCHAN, client.getNickname(), channel->getName() + " :Cannot join channel (+i)");
+	if (channel->isInviteOnly() && channel->isClientInvite(client) == false) {
+		sendServer(client, ERR_INVITEONLYCHAN(client.getNickname(), channel->getName()));
 		return ;
+	}
+
+	const int	&limit = channel->getLimit();
+
+	if (limit != 0 && limit <= (int)channel->getClients().size()) {
+		sendServer(client, ERR_CHANNELISFULL(client.getNickname(), channel->getName()));
+		return;
 	}
 
 	std::string	password = channel->getPassword();
 
 	if (password.empty() == false) {
 		if (this->param.size() < 2 || this->param[1].compare(password)) {
-			send_error(client, ERR_BADCHANNELKEY, client.getNickname(), channel->getName() + " :Cannot join channel (+k)");
+			sendServer(client, ERR_BADCHANNELKEY(client.getNickname(), channel->getName()));
 			return;
 		}
 	}
 
+	if (channel->isBan(client)) {
+		sendServer(client, ERR_BANNEDFROMCHAN(client.getNickname(), channel->getName()));
+		return;
+	}
+
 	channel->addClient(client);
 
-	send_priv(client, ":" + client.getNickname() + "!" + client.getUsername() + "@localhost" + " JOIN " + channel->getName());
+	if (channel->isClientInvite(client)) {
+		channel->removeInvite(client);
+	}
+
+	const std::string msg = ":" + client.getNickname() + "!" + client.getUsername() + "@localhost" + " JOIN " + channel->getName();
+	channel->broadcast(msg);
+
+	sendServer(client, RPL_TOPIC(client.getNickname(), channel->getName(), channel->getTopic()));
+	sendNameReply(client, *channel);
 }
 
 void	Request::handleKick(int client_fd) const
 {
 	Client &client = Server::getClient(client_fd);
+	const std::string channel_name = this->param[0];
+	const std::string target_name = this->param[1];
+
+	if (Server::isChannelExist(channel_name) == false) {
+		sendServer(client, ERR_NOSUCHCHANNEL(client.getNickname(), channel_name));
+		return;
+	}
+
 	Channel	*channel = Server::getChannel(this->param[0], client);
+
+	if (channel->haveClient(client) == false) {
+		sendServer(client, ERR_NOTONCHANNEL(client.getNickname(), channel_name));
+		return;
+	}
+
+	if (channel->isOp(client) == false) {
+		sendServer(client, ERR_CHANOPRIVSNEEDED(client.getNickname(), channel_name));
+		return;
+	}
+
+	if (channel->haveClient(target_name) == false) {
+		sendServer(client, ERR_USERNOTINCHANNEL(client.getNickname(), target_name, channel_name));
+		return;
+	}
+
 	Client &target = Server::getClient(this->param[1]);
 
-	std::string	reason = ":No reason";
+	std::string	reason = this->param.size() > 2 && this->param[2].empty() == false ? this->param[2] : "No reason";
+	std::string msg = ":" + client.getNickname() + "!" + client.getUsername() + "@localhost" + " KICK " + channel->getName() + " " + target.getNickname() + " :" + reason;
 
-	channel->kickMember(client, target, reason);
+	channel->broadcast(msg);
+	channel->removeClient(target);
 }
 
 void	Request::handlePart(int client_fd) const
 {
 	Client &client = Server::getClient(client_fd);
+	const std::string	channel_name = this->param[0];
 
-	if (Server::isChannelExist(this->param[0])) {
-		Channel *channel = Server::getChannel(this->param[0], client);
+	if (Server::isChannelExist(channel_name)) {
+		Channel *channel = Server::getChannel(channel_name, client);
 
 		if (channel->haveClient(client) == false) {
-			send_error(client, ERR_NOTONCHANNEL, channel->getName(), "You're not on that channel");
+			sendServer(client, ERR_NOTONCHANNEL(client.getNickname(), channel->getName()));
 			return ;
 		}
 
@@ -367,7 +550,7 @@ void	Request::handlePart(int client_fd) const
 			Server::deleteChannel(*channel);
 
 	} else {
-		send_error(client, ERR_NOSUCHCHANNEL, this->param[0], "No such channel");
+		sendServer(client, ERR_NOSUCHCHANNEL(client.getNickname(), channel_name));
 	}
 
 }
@@ -376,23 +559,183 @@ void	Request::handleCap(int client_fd) const
 {
 	Client	client = Server::getClient(client_fd);
 
+	if (client.isPass() == false) {
+		sendServer(client, ERR_NOTREGISTERED);
+		client.incrInvalidRequest();
+		return;
+	}
+
 	if (!this->param[0].compare("LS")) {
 		send_priv(client, ":localhost CAP * LS :\r\n");
 	}
 }
 
+void	Request::handleInvite(int client_fd) const
+{
+	Client	client = Server::getClient(client_fd);
+	const std::string	target_nick = this->param[0];
+
+	if (Server::isClientExist(target_nick) == false) {
+		sendServer(client, ERR_NOSUCHNICK(client.getNickname(), target_nick));
+		return;
+	}
+
+	Client	target = Server::getClient(target_nick);
+
+	const std::string	channel_name = this->param[1];
+
+	if (Server::isChannelExist(channel_name) == false) {
+		sendServer(client, ERR_NOSUCHCHANNEL(client.getNickname(), channel_name));
+		return;
+	}
+
+	Channel	*channel = Server::getChannel(channel_name, client);
+
+	if (channel->haveClient(client) == false) {
+		sendServer(client, ERR_NOTONCHANNEL(client.getNickname(), channel_name));
+		return;
+	}
+
+	if (channel->haveClient(target) == true) {
+		sendServer(client, ERR_USERONCHANNEL(client.getNickname(), channel_name));
+		return;
+	}
+
+	if (channel->isInviteOnly() == true && channel->isOp(client) == false) {
+		sendServer(client, ERR_CHANOPRIVSNEEDED(client.getNickname(), channel_name));
+		return;
+	}
+
+	if (channel->isClientInvite(target) == false) {
+		channel->inviteClient(target);
+	}
+
+	sendServer(client, RPL_INVITING(client.getNickname(), channel_name, target_nick));
+	sendServer(target, ":" + client.getNickname() + "!" + client.getUsername() + "@localhost INVITE " + target.getNickname() + " :" + channel->getName() + "\r\n");
+}
+
+void	Request::handleTopic(int client_fd) const
+{
+	Client	&client = Server::getClient(client_fd);
+	const	std::string	channel_name = this->param[0];
+
+	if (Server::isChannelExist(channel_name) == false) {
+		sendServer(client, ERR_NOSUCHCHANNEL(client.getNickname(), channel_name));
+		return;
+	}
+
+	Channel	*channel = Server::getChannel(channel_name, client);
+
+	if (channel->haveClient(client) == false) {
+		sendServer(client, ERR_NOTONCHANNEL(client.getNickname(), channel_name));
+		return;
+	}
+
+	if (this->param.size() < 2) { //Give Topic
+
+		const std::string &topic = channel->getTopic();
+
+		if (topic.empty() == true) {
+			sendServer(client, RPL_NOTOPIC(client.getNickname(), channel_name));
+			return;
+		}
+
+		sendServer(client, RPL_TOPIC(client.getNickname(), channel_name, topic));
+		return;
+
+	} else { //Set Topic
+
+		if (channel->isTopicOnlyOp() == true && channel->isOp(client) == false) {
+			sendServer(client, ERR_CHANOPRIVSNEEDED(client.getNickname(), channel_name));
+			return;
+		}
+
+		const std::string	&new_topic = this->param[1];
+
+		if (new_topic.empty() == true) {
+			sendServer(client, ERR_NEEDMOREPARAM(client.getNickname(), "TOPIC"));
+			return;
+		}
+
+		channel->setTopic(new_topic);
+
+		const std::string msg = ":" + client.getNickname() + "!" + client.getUsername() + "@localhost TOPIC " + channel_name + " :" + new_topic;
+		channel->broadcast(msg);
+		return;
+	}
+}
+
+void	Request::handleQuit(int client_fd) const
+{
+	Client	&client = Server::getClient(client_fd);
+	std::string msg;
+
+	if (this->param.size() > 0)
+		msg = this->param[0];
+
+	Server::clearClient(client, msg);
+	close(client.getFd());
+	std::cout << client.getNickname() << " quit." << std::endl;
+}
+
+void	Request::handlePass(int client_fd) const
+{
+	Client &client = Server::getClient(client_fd);
+	const std::string	passwd = this->param[0];
+
+	if (client.isSetup() || client.isPass()) {
+		sendServer(client, ERR_ALREADYREGISTRED(client.getNickname().empty() ? "*" : client.getNickname()));
+		return;
+	}
+
+	if (Server::getPassword() != passwd) {
+		sendServer(client, ERR_PASSWDMISMATCH(client.getNickname().empty() ? "*" : client.getNickname()));
+		return;
+	}
+
+	client.pass();
+}
+
 void	Request::exec(int client_fd) const
 {
+
+	Client	&client = Server::getClient(client_fd);
+
+	std::cout << client.getInvalidRequest() << std::endl;
+
+	if (client.isSetup() == false) {
+		if (this->command == "NICK")
+			this->handleNick(client_fd);
+		else if (this->command == "USER")
+			this->handleUser(client_fd);
+		else if (this->command == "CAP")
+			this->handleCap(client_fd);
+		else if (this->command == "PASS")
+			this->handlePass(client_fd);
+		else
+			std::cout << "Command not found" << std::endl;
+
+		if (client.getInvalidRequest() >= 10) {
+			Server::clearClient(client, "");
+			Server::removeClient(client);
+			close(client.getFd());
+			std::cout << "Client kick, not registered" << std::endl;
+		}
+
+		return;
+	}
+
+
 	if (!this->command.compare(0, 5, "NICK"))
-		this->nick(client_fd);
+		this->handleNick(client_fd);
 	else if (!this->command.compare(0, 8, "PRIVMSG")) {
 		this->privmsg(client_fd);
 	} else if (!this->command.compare(0, 5, "USER")) {
-		this->user(client_fd);
+		this->handleUser(client_fd);
 	} else if (!this->command.compare(0, 4, "CAP"))
 		this->handleCap(client_fd);
 	else if (!this->command.compare("MODE"))
-		this->mode(client_fd);
+		this->handleMode(client_fd);
 	else if (!this->command.compare("PING")) {
 		handlePing(client_fd);
 	} else if (!this->command.compare("JOIN"))
@@ -401,6 +744,12 @@ void	Request::exec(int client_fd) const
 		this->handleKick(client_fd);
 	else if (!this->command.compare("PART"))
 		this->handlePart(client_fd);
+	else if (!this->command.compare("INVITE"))
+		this->handleInvite(client_fd);
+	else if (!this->command.compare("TOPIC"))
+		this->handleTopic(client_fd);
+	else if (!this->command.compare("QUIT"))
+		this->handleQuit(client_fd);
 	else {
 		std::cout << "Command not found" << std::endl;
 	}

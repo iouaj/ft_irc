@@ -1,8 +1,10 @@
 #include "Client.hpp"
 
-Client::Client(const std::string &nickname, const int fd) : _nickname(nickname), _socket_fd(fd)
+Client::Client(const std::string &nickname, const int fd) : _nickname(nickname), _socket_fd(fd), _invalid_request(0)
 {
-
+	this->_visible = true;
+	this->_setup = false;
+	this->_pass = false;
 }
 
 Client::~Client(void)
@@ -46,10 +48,55 @@ void	Client::setVisible(void)
 	this->_visible = true;
 }
 
-const bool	&Client::getStatus(void)
+bool	Client::isVisible(void) const
 {
-	const bool &status = this->_visible;
-	return status;
+	return this->_visible == true;
+}
+
+void	Client::setup(void)
+{
+	this->_setup = true;
+	sendServer(*this, RPL_WELCOME(this->getNickname()));
+}
+
+bool	Client::isSetup(void) const
+{
+	return this->_setup == true;
+}
+
+void	Client::pass(void)
+{
+	this->_pass = true;
+}
+
+bool	Client::isPass(void) const
+{
+	return this->_pass == true;
+}
+
+void	Client::incrInvalidRequest(void)
+{
+	std::cout << this->_invalid_request << std::endl;
+	this->_invalid_request += 1;
+	std::cout << this->_invalid_request << std::endl;
+}
+
+const int	&Client::getInvalidRequest(void) const
+{
+	const int	&ref = this->_invalid_request;
+	return ref;
+}
+
+void	Client::sendEverywhere(const std::string &message) const
+{
+	std::list<Channel>	channels = Server::getAllChannels();
+	std::list<Channel>::iterator	it = channels.begin();
+
+	for (; it != channels.end(); it++)
+	{
+		if (it->haveClient(*this))
+			it->broadcast(message + "\r\n");
+	}
 }
 
 void	Client::sendMessage(const Client &target, const std::string &message) const

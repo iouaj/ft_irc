@@ -25,14 +25,18 @@ class Request
 		std::string	command;
 		std::vector<std::string>	param;
 
-		void	nick(int client_fd) const;
+		void	handleNick(int client_fd) const;
 		void	privmsg(int client_fd) const;
-		void	user(int client_fd) const;
-		void	mode(int client_fd) const;
+		void	handleUser(int client_fd) const;
+		void	handleMode(int client_fd) const;
 		void	handleJoin(int client_fd) const;
 		void	handleKick(int client_fd) const;
 		void	handlePart(int client_fd) const;
 		void	handleCap(int client_fd) const;
+		void	handleInvite(int client_fd) const;
+		void	handleTopic(int client_fd) const;
+		void	handleQuit(int client_fd) const;
+		void	handlePass(int client_fd) const;
 
 	public:
 		Request(const char *buffer);
