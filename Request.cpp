@@ -17,13 +17,12 @@ Request::Request(const char *buffer)
 
 	while (iss >> token)
 	{
-		std::cout << token << std::endl;
 		if (!token.empty() && token[0] == ':')
 		{
 			std::string rest;
 
 			if (std::getline(iss, rest)) {
-				this->param.push_back((token.substr(1)) + rest.substr(0, rest.size() - 2));
+				this->param.push_back(clean_string(token.substr(1) + rest));
 			}
 			break;
 		}
@@ -95,8 +94,9 @@ bool	isTextValid(const std::string &text)
 {
 	for (std::size_t i = 0; i < text.size(); i++)
 	{
-		if (std::isprint(text[i]) == false)
+		if (std::isprint(text[i]) == false) {
 			return false;
+		}
 	}
 	return true;
 }
@@ -117,11 +117,11 @@ void	Request::handlePrivmsg(int client_fd) const
 		const std::string message = this->param[1];
 		const std::string channelName = this->param[0];
 
-		std::cout << "message " << message;
 		if (message.empty() || isTextValid(message) == false) {
 			sendServer(client, ERR_NOTEXTTOSEND(client.getNickname()));
 			return;
 		}
+
 
 		if (Server::isChannelExist(channelName) == false) {
 			sendServer(client, ERR_NOSUCHNICK(client.getNickname(), channelName));
@@ -542,11 +542,11 @@ void	Request::handleCap(int client_fd) const
 {
 	Client	client = Server::getClient(client_fd);
 
-	if (client.isPass() == false) {
-		sendServer(client, ERR_NOTREGISTERED);
-		client.incrInvalidRequest();
-		return;
-	}
+	// if (client.isPass() == false) {
+	// 	sendServer(client, ERR_NOTREGISTERED);
+	// 	client.incrInvalidRequest();
+	// 	return;
+	// }
 
 	if (this->param.size() < 1) {
 		sendServer(client, ERR_NEEDMOREPARAM(client.getNickname(), "CAP"));
@@ -756,6 +756,8 @@ void	Request::exec(int client_fd) const
 		this->handleTopic(client_fd);
 	else if (!this->command.compare("QUIT"))
 		this->handleQuit(client_fd);
+	else if (!this->command.compare("WHO"))
+		return;
 	else
 		sendServer(client, ERR_UNKNOWNCOMMAND(client.getNickname(), this->command));
 }

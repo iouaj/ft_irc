@@ -173,6 +173,7 @@ void	Server::shutdown_server()
 		close(it->getFd());
 	}
 
+	shutdown(Server::getEpollFd(), SHUT_RDWR);
 	close(Server::getEpollFd());
 	shutdown(Server::getSocket(), SHUT_RDWR);
 	close(Server::getSocket());

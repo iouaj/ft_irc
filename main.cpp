@@ -131,7 +131,6 @@ int main (int argc, char *argv[])
 				int bytes_read = recv(events[i].data.fd, buffer, sizeof(buffer), 0);
 				if (bytes_read > 0) {
 					buffer[bytes_read] = 0;
-					std::cout << buffer << std::endl;
 					std::list<std::string> list = split(buffer);
 
 					while (list.empty() == false)

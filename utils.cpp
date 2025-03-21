@@ -7,17 +7,17 @@ void	sendServer(const Client &target, std::string message)
 	}
 }
 
-// std::string	clean_string(std::string str)
-// {
-// 	std::string clean("");
-// 	for (std::size_t i = 0; i <= str.size(); i++)
-// 	{
-// 		if (std::isprint(str[i]) && str[i] != '\n' && str[i] != '\r' && str[i] != 0) {
-// 			clean += str[i];
-// 		}
-// 	}
-// 	return clean;
-// }
+std::string	clean_string(std::string str)
+{
+	std::string clean;
+	for (std::size_t i = 0; i <= str.size(); i++)
+	{
+		if (str[i] != '\n' && str[i] != '\r' && str[i] != 0) {
+			clean += str[i];
+		}
+	}
+	return clean;
+}
 
 bool	isNumericString(const std::string &str)
 {
